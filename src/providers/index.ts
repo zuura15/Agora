@@ -4,6 +4,9 @@ import { streamOpenAI, testOpenAIKey, discoverOpenAIModels } from './openai';
 import { streamAnthropic, testAnthropicKey, discoverAnthropicModels } from './anthropic';
 import { streamGemini, testGeminiKey, discoverGeminiModels } from './gemini';
 import { streamXAI, testXAIKey, discoverXAIModels } from './xai';
+import { proxyStream } from '../proxy/proxyStream';
+import { useAppStore } from '../store/appStore';
+import { supabase } from '../lib/supabase';
 
 export type StreamFn = (
   apiKey: string,
@@ -39,6 +42,23 @@ const discoverFns: Record<string, DiscoverModelsFn> = {
 };
 
 export function getStreamFn(providerId: string): StreamFn {
+  // Check if proxy is enabled for this provider
+  const { proxyProviders } = useAppStore.getState();
+  if (proxyProviders?.has(providerId)) {
+    // Verify user is logged in before using proxy
+    const sessionPromise = supabase.auth.getSession();
+    return async (apiKey, model, query, files, callbacks, signal) => {
+      const { data: { session } } = await sessionPromise;
+      if (session) {
+        return proxyStream(providerId, apiKey, model, query, files, callbacks, signal);
+      }
+      // Fall back to direct if not authenticated
+      const fn = streamFns[providerId];
+      if (!fn) throw new Error(`Unknown provider: ${providerId}`);
+      return fn(apiKey, model, query, files, callbacks, signal);
+    };
+  }
+
   const fn = streamFns[providerId];
   if (!fn) throw new Error(`Unknown provider: ${providerId}`);
   return fn;

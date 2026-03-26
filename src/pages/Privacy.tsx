@@ -64,6 +64,20 @@ export function Privacy() {
             </p>
           </Section>
 
+          <Section title="What changes when you sign in">
+            <p className="text-text-secondary mb-2">
+              Signing in is completely optional. The app works fully without an account. If you choose to sign in (via Google, GitHub, or X), the following additional features become available:
+            </p>
+            <ul className="list-disc list-inside space-y-1 text-text-secondary">
+              <li><strong className="text-text-primary">API key sync</strong> — Your API keys are encrypted server-side using AES-256-GCM and stored in a Supabase Postgres database. They are decrypted only when retrieved by your authenticated session.</li>
+              <li><strong className="text-text-primary">Preference sync</strong> — Your selected models, theme, and other settings are stored in the database so they follow you across devices.</li>
+              <li><strong className="text-text-primary">History sync (opt-in)</strong> — If you enable this in Settings, your query history is stored in the cloud. This is disabled by default.</li>
+            </ul>
+            <p className="text-text-secondary mt-2">
+              All cloud-stored data is protected by row-level security — only your authenticated session can access your data.
+            </p>
+          </Section>
+
           <Section title="How to delete your local data">
             <p className="text-text-secondary">
               Go to Settings {'\u2192'} Clear All Data. This removes all API keys from localStorage and clears all query history from IndexedDB. You can also clear individual history entries from the History sidebar, or use your browser's built-in tools to clear site data.

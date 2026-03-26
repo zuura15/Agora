@@ -3,6 +3,8 @@ import { useAppStore } from '../store/appStore';
 import { PROVIDERS, PROVIDER_IDS } from '../providers/capabilities';
 import { useModelDiscovery } from '../hooks/useModelDiscovery';
 import { getTestKeyFn } from '../providers/index';
+import { useAuth } from '../auth/useAuth';
+import { LoginModal } from '../auth/LoginModal';
 
 export function SettingsDrawer() {
   const settingsOpen = useAppStore(s => s.settingsOpen);
@@ -33,6 +35,9 @@ export function SettingsDrawer() {
             Close
           </button>
         </div>
+
+        {/* Account */}
+        <AccountSection />
 
         {/* API Keys */}
         <section className="px-4 py-4 border-b border-border">
@@ -203,5 +208,83 @@ function SettingsKeyRow({ providerId }: { providerId: string }) {
         </div>
       )}
     </div>
+  );
+}
+
+function AccountSection() {
+  const { user, isLoggedIn, logout } = useAuth();
+  const [showLogin, setShowLogin] = useState(false);
+  const historySyncEnabled = useAppStore(s => s.historySyncEnabled);
+  const setHistorySyncEnabled = useAppStore(s => s.setHistorySyncEnabled);
+  const proxyProviders = useAppStore(s => s.proxyProviders);
+  const toggleProxyProvider = useAppStore(s => s.toggleProxyProvider);
+
+  return (
+    <section className="px-4 py-4 border-b border-border">
+      <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-3">Account</h3>
+      {isLoggedIn ? (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            {user?.user_metadata?.avatar_url && (
+              <img src={user.user_metadata.avatar_url} alt="" className="w-6 h-6 rounded-full" />
+            )}
+            <div>
+              <p className="text-xs text-text-primary">{user?.user_metadata?.full_name || user?.email}</p>
+              <p className="text-[10px] text-text-secondary">{user?.email}</p>
+            </div>
+          </div>
+          <p className="text-[10px] text-success mb-3">API keys and preferences are syncing to the cloud.</p>
+
+          <div className="flex items-center justify-between mb-3 py-1.5">
+            <div>
+              <p className="text-[11px] text-text-primary">Sync query history</p>
+              <p className="text-[10px] text-text-secondary">Save history to the cloud for cross-device access</p>
+            </div>
+            <button
+              onClick={() => setHistorySyncEnabled(!historySyncEnabled)}
+              className={`w-8 h-4 rounded-full transition-colors relative ${historySyncEnabled ? 'bg-accent' : 'bg-border'}`}
+            >
+              <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${historySyncEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
+
+          {/* Proxy toggles for discouraged providers */}
+          {['openai', 'xai'].map(id => (
+            <div key={id} className="flex items-center justify-between mb-3 py-1.5">
+              <div>
+                <p className="text-[11px] text-text-primary">Proxy {PROVIDERS[id].name}</p>
+                <p className="text-[10px] text-text-secondary">Route queries through server — key stays hidden from browser</p>
+              </div>
+              <button
+                onClick={() => toggleProxyProvider(id)}
+                className={`w-8 h-4 rounded-full transition-colors relative ${proxyProviders.has(id) ? 'bg-accent' : 'bg-border'}`}
+              >
+                <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${proxyProviders.has(id) ? 'translate-x-4' : 'translate-x-0.5'}`} />
+              </button>
+            </div>
+          ))}
+
+          <button
+            onClick={logout}
+            className="text-[11px] text-text-secondary hover:text-text-primary transition-colors"
+          >
+            Sign out
+          </button>
+        </div>
+      ) : (
+        <div>
+          <p className="text-[11px] text-text-secondary/70 mb-2 leading-snug">
+            Sign in to sync your API keys and settings across devices. Optional — the app works fully without an account.
+          </p>
+          <button
+            onClick={() => setShowLogin(true)}
+            className="px-3 py-1.5 text-xs bg-accent/10 border border-accent/30 rounded text-accent hover:bg-accent/20 transition-colors"
+          >
+            Sign in
+          </button>
+          {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
+        </div>
+      )}
+    </section>
   );
 }

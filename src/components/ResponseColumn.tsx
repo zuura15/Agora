@@ -6,10 +6,11 @@ import type { ResponseState } from '../hooks/useProviders';
 interface Props {
   response: ResponseState;
   index: number;
+  query?: string;
   onRetry: (providerId: string) => void;
 }
 
-export function ResponseColumn({ response, index, onRetry }: Props) {
+export function ResponseColumn({ response, index, query, onRetry }: Props) {
   const [copied, setCopied] = useState(false);
   const isJudge = response.providerId === '__judge';
   const provider = isJudge ? null : PROVIDERS[response.providerId];
@@ -108,6 +109,18 @@ export function ResponseColumn({ response, index, onRetry }: Props) {
           >
             Retry
           </button>
+          {!isJudge && provider?.chatUrl && query && (
+            <button
+              onClick={async () => {
+                const text = `My question:\n${query}\n\nYour response:\n${response.text}\n\n---\nI'd like to continue this conversation.`;
+                await navigator.clipboard.writeText(text);
+                window.open(provider.chatUrl, '_blank');
+              }}
+              className="text-[10px] text-text-secondary hover:text-accent transition-colors ml-auto"
+            >
+              Continue in {provider.name}
+            </button>
+          )}
         </div>
       )}
     </div>

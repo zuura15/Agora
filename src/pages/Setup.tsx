@@ -5,7 +5,8 @@ import { useAppStore } from '../store/appStore';
 
 export function Setup() {
   const navigate = useNavigate();
-  const hasAnyKey = useAppStore(s => s.hasAnyKey)();
+  const apiKeys = useAppStore(s => s.apiKeys);
+  const hasAnyKey = Object.keys(apiKeys).length > 0;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
@@ -34,7 +35,7 @@ export function Setup() {
             Start using Argeon
           </button>
           <p className="text-[11px] text-text-secondary/60 mt-3">
-            Keys are saved in your browser's local storage. You can update or remove them anytime in Settings.
+            Keys are saved in your browser's local storage. Sign in to sync them across devices.
           </p>
         </div>
       </div>

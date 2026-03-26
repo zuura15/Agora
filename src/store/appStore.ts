@@ -24,6 +24,12 @@ interface AppState {
   judgeProvider: string | null;
   setJudgeProvider: (id: string | null) => void;
 
+  // Sync
+  historySyncEnabled: boolean;
+  setHistorySyncEnabled: (v: boolean) => void;
+  proxyProviders: Set<string>;
+  toggleProxyProvider: (id: string) => void;
+
   // Theme
   theme: 'dark' | 'light';
   toggleTheme: () => void;
@@ -92,6 +98,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedModels: loadModels(),
   discoveredModels: loadDiscoveredModels(),
   judgeProvider: localStorage.getItem('agora_judge') || null,
+  historySyncEnabled: localStorage.getItem('agora_history_sync') === 'true',
+  proxyProviders: new Set(JSON.parse(localStorage.getItem('agora_proxy_providers') || '[]')),
   theme: (localStorage.getItem('agora_theme') as 'dark' | 'light') || 'dark',
   historyOpen: false,
   settingsOpen: false,
@@ -159,6 +167,24 @@ export const useAppStore = create<AppState>((set, get) => ({
       localStorage.removeItem('agora_judge');
     }
     set({ judgeProvider: id });
+  },
+
+  setHistorySyncEnabled: (v) => {
+    localStorage.setItem('agora_history_sync', String(v));
+    set({ historySyncEnabled: v });
+  },
+
+  toggleProxyProvider: (id) => {
+    set(state => {
+      const proxyProviders = new Set(state.proxyProviders);
+      if (proxyProviders.has(id)) {
+        proxyProviders.delete(id);
+      } else {
+        proxyProviders.add(id);
+      }
+      localStorage.setItem('agora_proxy_providers', JSON.stringify([...proxyProviders]));
+      return { proxyProviders };
+    });
   },
 
   toggleTheme: () => {

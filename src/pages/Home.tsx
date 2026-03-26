@@ -11,13 +11,14 @@ import { QueryInput } from '../components/QueryInput';
 import { ResponseColumn } from '../components/ResponseColumn';
 import { HistorySidebar } from '../components/HistorySidebar';
 import { SettingsDrawer } from '../components/SettingsDrawer';
+import { UserMenu } from '../auth/UserMenu';
 import type { NormalizedFile } from '../lib/fileUtils';
 import type { QuerySession } from '../lib/dexie';
 
 export function Home() {
   const navigate = useNavigate();
   const { sessionId } = useParams<{ sessionId: string }>();
-  const hasAnyKey = useAppStore(s => s.hasAnyKey)();
+  const hasAnyKey = Object.keys(useAppStore(s => s.apiKeys)).length > 0;
   const toggleHistory = useAppStore(s => s.toggleHistory);
   const toggleSettings = useAppStore(s => s.toggleSettings);
   const theme = useAppStore(s => s.theme);
@@ -175,6 +176,7 @@ export function Home() {
               <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.32 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
             </svg>
           </button>
+          <UserMenu />
         </div>
       </header>
 
@@ -214,6 +216,7 @@ export function Home() {
                       key={r.providerId}
                       response={r}
                       index={i}
+                      query={lastQuery}
                       onRetry={handleRetry}
                     />
                   ))}

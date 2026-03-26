@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles/globals.css'
+import { AuthProvider } from './auth/AuthProvider'
 import App from './App'
 
 // Apply saved theme before render to prevent flash
@@ -9,6 +10,8 @@ document.documentElement.setAttribute('data-theme', savedTheme);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <AuthProvider>
+      <App />
+    </AuthProvider>
   </StrictMode>,
 )

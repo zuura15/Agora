@@ -13,6 +13,7 @@ export interface ProviderCapability {
   brandColor: string;
   keyDashboardUrl: string;
   keyPlaceholder: string;
+  chatUrl: string;
 }
 
 export const PROVIDERS: Record<string, ProviderCapability> = {
@@ -31,6 +32,7 @@ export const PROVIDERS: Record<string, ProviderCapability> = {
     brandColor: '#10a37f',
     keyDashboardUrl: 'https://platform.openai.com/api-keys',
     keyPlaceholder: 'sk-...',
+    chatUrl: 'https://chat.openai.com',
   },
   anthropic: {
     id: 'anthropic',
@@ -47,6 +49,7 @@ export const PROVIDERS: Record<string, ProviderCapability> = {
     brandColor: '#d4a27f',
     keyDashboardUrl: 'https://console.anthropic.com/settings/keys',
     keyPlaceholder: 'sk-ant-...',
+    chatUrl: 'https://claude.ai',
   },
   gemini: {
     id: 'gemini',
@@ -63,6 +66,7 @@ export const PROVIDERS: Record<string, ProviderCapability> = {
     brandColor: '#4285f4',
     keyDashboardUrl: 'https://aistudio.google.com/apikey',
     keyPlaceholder: 'AIza...',
+    chatUrl: 'https://gemini.google.com',
   },
   xai: {
     id: 'xai',
@@ -79,6 +83,7 @@ export const PROVIDERS: Record<string, ProviderCapability> = {
     brandColor: '#ffffff',
     keyDashboardUrl: 'https://console.x.ai/',
     keyPlaceholder: 'xai-...',
+    chatUrl: 'https://grok.x.ai',
   },
 };
 
