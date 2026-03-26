@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 import { parseApiError, type StreamCallbacks } from '../lib/streamUtils';
 import type { NormalizedFile } from '../lib/fileUtils';
 import { extractTextFromPdf } from '../lib/fileUtils';
+import type { ConversationTurn } from '../providers/index';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -13,6 +14,7 @@ export async function proxyStream(
   files: NormalizedFile[],
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
+  _history?: ConversationTurn[],
 ): Promise<void> {
   // Build the input in the same format as the direct adapters
   const content: Array<Record<string, unknown>> = [];

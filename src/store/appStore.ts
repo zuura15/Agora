@@ -30,6 +30,32 @@ interface AppState {
   proxyProviders: Set<string>;
   toggleProxyProvider: (id: string) => void;
 
+  // General settings
+  responseLength: 'normal' | 'brief' | 'superbrief';
+  setResponseLength: (v: 'normal' | 'brief' | 'superbrief') => void;
+  temperature: number;
+  setTemperature: (v: number) => void;
+  autoJudge: boolean;
+  setAutoJudge: (v: boolean) => void;
+  sendKey: 'enter' | 'ctrl-enter';
+  setSendKey: (v: 'enter' | 'ctrl-enter') => void;
+
+  // Display settings
+  renderMarkdown: boolean;
+  setRenderMarkdown: (v: boolean) => void;
+  showCost: boolean;
+  setShowCost: (v: boolean) => void;
+  showTokens: boolean;
+  setShowTokens: (v: boolean) => void;
+  autoScroll: boolean;
+  setAutoScroll: (v: boolean) => void;
+  columnLayout: 'auto' | '1' | '2' | '3';
+  setColumnLayout: (v: 'auto' | '1' | '2' | '3') => void;
+
+  // Data settings
+  autoClearDays: number | null;
+  setAutoClearDays: (v: number | null) => void;
+
   // Theme
   theme: 'dark' | 'light';
   toggleTheme: () => void;
@@ -93,11 +119,21 @@ function loadDiscoveredModels(): Record<string, string[]> {
 export const useAppStore = create<AppState>((set, get) => ({
   apiKeys: loadKeys(),
   activeProviders: new Set(
-    PROVIDER_IDS.filter(id => !!localStorage.getItem(`agora_key_${id}`))
+    PROVIDER_IDS.filter(id => !!localStorage.getItem(`agora_key_${id}`)).slice(0, 3)
   ),
   selectedModels: loadModels(),
   discoveredModels: loadDiscoveredModels(),
   judgeProvider: localStorage.getItem('agora_judge') || null,
+  responseLength: (localStorage.getItem('agora_response_length') as 'normal' | 'brief' | 'superbrief') || 'brief',
+  temperature: parseFloat(localStorage.getItem('agora_temperature') || '0.7'),
+  autoJudge: localStorage.getItem('agora_auto_judge') === 'true',
+  sendKey: (localStorage.getItem('agora_send_key') as 'enter' | 'ctrl-enter') || 'enter',
+  renderMarkdown: localStorage.getItem('agora_render_markdown') !== 'false',
+  showCost: localStorage.getItem('agora_show_cost') !== 'false',
+  showTokens: localStorage.getItem('agora_show_tokens') !== 'false',
+  autoScroll: localStorage.getItem('agora_auto_scroll') !== 'false',
+  columnLayout: (localStorage.getItem('agora_column_layout') as 'auto' | '1' | '2' | '3') || 'auto',
+  autoClearDays: localStorage.getItem('agora_auto_clear_days') ? parseInt(localStorage.getItem('agora_auto_clear_days')!) : null,
   historySyncEnabled: localStorage.getItem('agora_history_sync') === 'true',
   proxyProviders: new Set(JSON.parse(localStorage.getItem('agora_proxy_providers') || '[]')),
   theme: (localStorage.getItem('agora_theme') as 'dark' | 'light') || 'dark',
@@ -109,7 +145,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     set(state => {
       const apiKeys = { ...state.apiKeys, [providerId]: key };
       const activeProviders = new Set(state.activeProviders);
-      activeProviders.add(providerId);
+      if (activeProviders.size < 3) {
+        activeProviders.add(providerId);
+      }
       return { apiKeys, activeProviders };
     });
   },
@@ -167,6 +205,60 @@ export const useAppStore = create<AppState>((set, get) => ({
       localStorage.removeItem('agora_judge');
     }
     set({ judgeProvider: id });
+  },
+
+  setResponseLength: (v) => {
+    localStorage.setItem('agora_response_length', v);
+    set({ responseLength: v });
+  },
+
+  setTemperature: (v) => {
+    localStorage.setItem('agora_temperature', String(v));
+    set({ temperature: v });
+  },
+
+  setAutoJudge: (v) => {
+    localStorage.setItem('agora_auto_judge', String(v));
+    set({ autoJudge: v });
+  },
+
+  setSendKey: (v) => {
+    localStorage.setItem('agora_send_key', v);
+    set({ sendKey: v });
+  },
+
+  setRenderMarkdown: (v) => {
+    localStorage.setItem('agora_render_markdown', String(v));
+    set({ renderMarkdown: v });
+  },
+
+  setShowCost: (v) => {
+    localStorage.setItem('agora_show_cost', String(v));
+    set({ showCost: v });
+  },
+
+  setShowTokens: (v) => {
+    localStorage.setItem('agora_show_tokens', String(v));
+    set({ showTokens: v });
+  },
+
+  setAutoScroll: (v) => {
+    localStorage.setItem('agora_auto_scroll', String(v));
+    set({ autoScroll: v });
+  },
+
+  setColumnLayout: (v) => {
+    localStorage.setItem('agora_column_layout', v);
+    set({ columnLayout: v });
+  },
+
+  setAutoClearDays: (v) => {
+    if (v !== null) {
+      localStorage.setItem('agora_auto_clear_days', String(v));
+    } else {
+      localStorage.removeItem('agora_auto_clear_days');
+    }
+    set({ autoClearDays: v });
   },
 
   setHistorySyncEnabled: (v) => {

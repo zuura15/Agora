@@ -26,7 +26,12 @@ export function Home() {
   const activeProviders = useAppStore(s => s.activeProviders);
   const apiKeys = useAppStore(s => s.apiKeys);
 
-  const { responses, isQuerying, sendQuery, retryProvider, cancelAll } = useProviders();
+  const {
+    responses, conversation, isQuerying,
+    followUpMode, setFollowUpMode,
+    followUpProviders, setFollowUpProviders,
+    sendQuery, retryProvider, cancelAll, clearConversation,
+  } = useProviders();
   const [lastQuery, setLastQuery] = useState('');
   const [lastFiles, setLastFiles] = useState<NormalizedFile[]>([]);
   const [loadedSession, setLoadedSession] = useState<Record<string, ResponseState> | null>(null);
@@ -109,20 +114,27 @@ export function Home() {
     }
   }, [loadSessionData, navigate]);
 
-  const displayResponses = loadedSession || responses;
-  const allResponses = Object.values(displayResponses);
-  const judgeResponse = allResponses.find(r => r.providerId === '__judge');
-  const responseList = allResponses.filter(r => r.providerId !== '__judge');
-  const hasResponses = allResponses.length > 0;
+  // For column layout calculation
+  const latestResponses = conversation.length > 0
+    ? Object.values(conversation[conversation.length - 1].responses).filter(r => r.providerId !== '__judge')
+    : [];
 
   // Check for PDF warnings
   const pdfWarnings = lastFiles.some(f => f.type === 'pdf')
     ? Array.from(activeProviders).filter(id => apiKeys[id] && !PROVIDERS[id]?.supportsPdfInput)
     : [];
 
+  const columnLayout = useAppStore(s => s.columnLayout);
+
   // Responsive column count
   const getColumnClass = () => {
-    const count = responseList.length;
+    if (columnLayout !== 'auto') {
+      const cols = parseInt(columnLayout);
+      if (cols === 1) return 'grid-cols-1';
+      if (cols === 2) return 'grid-cols-1 md:grid-cols-2';
+      if (cols === 3) return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
+    }
+    const count = latestResponses.length;
     if (count <= 1) return 'grid-cols-1';
     if (count === 2) return 'grid-cols-1 md:grid-cols-2';
     if (count === 3) return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
@@ -185,15 +197,17 @@ export function Home() {
         <HistorySidebar onLoadSession={handleLoadSession} />
 
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <QueryInput onSend={handleSend} isQuerying={isQuerying} onCancel={cancelAll} />
-
-          {/* Current query display */}
-          {lastQuery && hasResponses && (
-            <div className="px-4 pt-3 pb-1">
-              <p className="text-xs text-text-secondary mb-0.5">You asked:</p>
-              <p className="text-sm text-text-primary leading-relaxed">{lastQuery}</p>
-            </div>
-          )}
+          <QueryInput
+            onSend={handleSend}
+            isQuerying={isQuerying}
+            onCancel={cancelAll}
+            followUpMode={followUpMode}
+            onToggleFollowUp={setFollowUpMode}
+            followUpProviders={followUpProviders}
+            onSetFollowUpProviders={setFollowUpProviders}
+            hasConversation={conversation.length > 0}
+            onClearConversation={clearConversation}
+          />
 
           {/* PDF warnings */}
           {pdfWarnings.length > 0 && (
@@ -208,26 +222,49 @@ export function Home() {
 
           {/* Response area */}
           <div className="flex-1 overflow-y-auto p-4">
-            {hasResponses ? (
-              <div className="flex flex-col gap-4 h-full">
-                <div className={`grid ${getColumnClass()} gap-4`}>
-                  {responseList.map((r, i) => (
-                    <ResponseColumn
-                      key={r.providerId}
-                      response={r}
-                      index={i}
-                      query={lastQuery}
-                      onRetry={handleRetry}
-                    />
-                  ))}
-                </div>
-                {judgeResponse && (
-                  <ResponseColumn
-                    response={judgeResponse}
-                    index={responseList.length}
-                    onRetry={() => {}}
-                  />
-                )}
+            {conversation.length > 0 ? (
+              <div className="flex flex-col gap-6">
+                {conversation.map((entry, entryIdx) => {
+                  const entryResponses = Object.values(entry.responses);
+                  const entryJudge = entryResponses.find(r => r.providerId === '__judge');
+                  const entryList = entryResponses.filter(r => r.providerId !== '__judge');
+                  return (
+                    <div key={entryIdx}>
+                      {/* Query label */}
+                      <div className="px-1 pb-2">
+                        <p className="text-xs text-text-secondary mb-0.5">
+                          {entry.isFollowUp ? 'Follow-up:' : 'You asked:'}
+                        </p>
+                        <p className="text-sm text-text-primary leading-relaxed">{entry.query}</p>
+                      </div>
+                      {/* Response columns */}
+                      <div className={`grid ${getColumnClass()} gap-4`}>
+                        {entryList.map((r, i) => (
+                          <ResponseColumn
+                            key={r.providerId}
+                            response={r}
+                            index={i}
+                            query={entry.query}
+                            onRetry={handleRetry}
+                          />
+                        ))}
+                      </div>
+                      {entryJudge && (
+                        <div className="mt-4">
+                          <ResponseColumn
+                            response={entryJudge}
+                            index={entryList.length}
+                            onRetry={() => {}}
+                          />
+                        </div>
+                      )}
+                      {/* Separator between conversation turns */}
+                      {entryIdx < conversation.length - 1 && (
+                        <div className="border-t border-border/30 mt-4" />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <EmptyState />

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { PROVIDERS } from '../providers/capabilities';
+import { PROVIDERS, type ProviderCapability } from '../providers/capabilities';
+import { useAppStore } from '../store/appStore';
 import type { ResponseState } from '../hooks/useProviders';
 
 
@@ -14,6 +15,9 @@ export function ResponseColumn({ response, index, query, onRetry }: Props) {
   const [copied, setCopied] = useState(false);
   const isJudge = response.providerId === '__judge';
   const provider = isJudge ? null : PROVIDERS[response.providerId];
+  const showCost = useAppStore(s => s.showCost);
+  const showTokens = useAppStore(s => s.showTokens);
+  const renderMarkdown = useAppStore(s => s.renderMarkdown);
 
   const handleCopy = useCallback(async () => {
     await navigator.clipboard.writeText(response.text);
@@ -61,10 +65,10 @@ export function ResponseColumn({ response, index, query, onRetry }: Props) {
           {!response.streaming && !response.error && (
             <span className="text-[10px] text-text-secondary">
               {formatTime(response.elapsedMs)}
-              {response.usage
+              {showTokens && (response.usage
                 ? ` · ${response.usage.inputTokens + response.usage.outputTokens} tokens`
-                : ` · ~${response.estimatedTokens} tokens`}
-              {response.costUsd !== null && ` · $${response.costUsd < 0.01 ? response.costUsd.toFixed(4) : response.costUsd.toFixed(3)}`}
+                : ` · ~${response.estimatedTokens} tokens`)}
+              {showCost && response.costUsd !== null && ` · $${response.costUsd < 0.01 ? response.costUsd.toFixed(4) : response.costUsd.toFixed(3)}`}
             </span>
           )}
         </div>
@@ -87,7 +91,7 @@ export function ResponseColumn({ response, index, query, onRetry }: Props) {
           <div className={response.streaming ? 'streaming-cursor' : ''}>
             {response.text.split('\n').map((line, i) => (
               <p key={i} className={line === '' ? 'h-3' : ''}>
-                {renderInlineFormatting(line)}
+                {renderMarkdown ? renderInlineFormatting(line) : line}
               </p>
             ))}
           </div>
@@ -110,20 +114,62 @@ export function ResponseColumn({ response, index, query, onRetry }: Props) {
             Retry
           </button>
           {!isJudge && provider?.chatUrl && query && (
-            <button
-              onClick={async () => {
-                const text = `My question:\n${query}\n\nYour response:\n${response.text}\n\n---\nI'd like to continue this conversation.`;
-                await navigator.clipboard.writeText(text);
-                window.open(provider.chatUrl, '_blank');
-              }}
-              className="text-[10px] text-text-secondary hover:text-accent transition-colors ml-auto"
-            >
-              Continue in {provider.name}
-            </button>
+            <ContinueButton provider={provider} query={query} responseText={response.text} />
           )}
         </div>
       )}
     </div>
+  );
+}
+
+function ContinueButton({ provider, query, responseText }: { provider: ProviderCapability; query: string; responseText: string }) {
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyAndOpen = () => {
+    const text = `My question:\n${query}\n\nYour response:\n${responseText}\n\n---\nI'd like to continue this conversation.`;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+
+    window.open(provider.chatUrl, '_blank', 'width=1000,height=700,noopener');
+
+    setTimeout(() => {
+      setCopied(false);
+      setShowConfirm(false);
+    }, 3000);
+  };
+
+  if (showConfirm) {
+    return (
+      <div className="flex items-center gap-2 ml-auto">
+        <span className="text-[9px] text-text-secondary">Conversation copied to clipboard — paste it in {provider.name}</span>
+        {!copied ? (
+          <button
+            onClick={handleCopyAndOpen}
+            className="text-[10px] text-accent hover:text-accent-hover transition-colors whitespace-nowrap"
+          >
+            Copy & open
+          </button>
+        ) : (
+          <span className="text-[10px] text-success whitespace-nowrap">Copied! Opening...</span>
+        )}
+        <button
+          onClick={() => setShowConfirm(false)}
+          className="text-[10px] text-text-secondary hover:text-text-primary transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setShowConfirm(true)}
+      className="text-[10px] text-text-secondary hover:text-accent transition-colors ml-auto"
+    >
+      Continue in {provider.name}
+    </button>
   );
 }
 

@@ -1,5 +1,7 @@
 import { type NormalizedFile, extractTextFromPdf } from '../lib/fileUtils';
-import { parseSSEStream, parseApiError, type StreamCallbacks } from '../lib/streamUtils';
+import { parseApiError, type StreamCallbacks } from '../lib/streamUtils';
+import { getResponseLengthConfig } from '../lib/responseLength';
+import type { ConversationTurn } from './index';
 
 const BASE_URL = 'https://api.openai.com/v1';
 
@@ -10,40 +12,48 @@ export async function streamOpenAI(
   files: NormalizedFile[],
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
+  history?: ConversationTurn[],
 ): Promise<void> {
-  // Build content parts for the user message
-  const content: Array<Record<string, unknown>> = [];
+  const { systemPrompt, temperature } = getResponseLengthConfig();
 
-  for (const file of files) {
-    if (file.type === 'image') {
-      content.push({
-        type: 'input_image',
-        image_url: `data:${file.mimeType};base64,${file.base64Data}`,
-      });
-    } else if (file.type === 'pdf') {
-      const text = await extractTextFromPdf(file);
-      content.push({
-        type: 'input_text',
-        text: `[Content from ${file.filename}]:\n${text}`,
-      });
-    } else if (file.type === 'text') {
-      const text = atob(file.base64Data);
-      content.push({
-        type: 'input_text',
-        text: `[Content from ${file.filename}]:\n${text}`,
-      });
+  // Use Chat Completions API — works for both single and multi-turn
+  const messages: Array<Record<string, unknown>> = [];
+
+  if (systemPrompt) {
+    messages.push({ role: 'system', content: systemPrompt });
+  }
+
+  // Add conversation history
+  if (history?.length) {
+    for (const turn of history) {
+      messages.push({ role: turn.role, content: turn.content });
     }
   }
 
-  content.push({ type: 'input_text', text: query });
+  // Build current user message
+  if (files.length > 0) {
+    const parts: Array<Record<string, unknown>> = [];
+    for (const file of files) {
+      if (file.type === 'image') {
+        parts.push({
+          type: 'image_url',
+          image_url: { url: `data:${file.mimeType};base64,${file.base64Data}` },
+        });
+      } else if (file.type === 'pdf') {
+        const text = await extractTextFromPdf(file);
+        parts.push({ type: 'text', text: `[Content from ${file.filename}]:\n${text}` });
+      } else if (file.type === 'text') {
+        const text = atob(file.base64Data);
+        parts.push({ type: 'text', text: `[Content from ${file.filename}]:\n${text}` });
+      }
+    }
+    parts.push({ type: 'text', text: query });
+    messages.push({ role: 'user', content: parts });
+  } else {
+    messages.push({ role: 'user', content: query });
+  }
 
-  // Responses API expects input as a string or array of messages
-  const input = [{
-    role: 'user',
-    content,
-  }];
-
-  const response = await fetch(`${BASE_URL}/responses`, {
+  const response = await fetch(`${BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -51,8 +61,10 @@ export async function streamOpenAI(
     },
     body: JSON.stringify({
       model,
-      input,
+      messages,
       stream: true,
+      temperature,
+      stream_options: { include_usage: true },
     }),
     signal,
   });
@@ -90,39 +102,17 @@ export async function streamOpenAI(
           }
           try {
             const parsed = JSON.parse(data);
-            // Responses API: text delta
-            if (parsed.type === 'response.output_text.delta' && typeof parsed.delta === 'string') {
-              callbacks.onToken(parsed.delta);
+            // Chat Completions streaming delta
+            const delta = parsed.choices?.[0]?.delta?.content;
+            if (typeof delta === 'string') {
+              callbacks.onToken(delta);
             }
-            // Completed response — extract usage and fallback text
-            if (parsed.type === 'response.completed' && !signal?.aborted) {
-              const resp = parsed.response;
-              // Extract usage
-              if (resp?.usage) {
-                callbacks.onUsage({
-                  inputTokens: resp.usage.input_tokens || 0,
-                  outputTokens: resp.usage.output_tokens || 0,
-                });
-              }
-              // Fallback: extract full text if we missed deltas
-              const output = resp?.output;
-              if (Array.isArray(output)) {
-                for (const item of output) {
-                  if (item.type === 'message' && Array.isArray(item.content)) {
-                    for (const part of item.content) {
-                      if (part.type === 'output_text' && part.text) {
-                        callbacks.onToken(part.text);
-                      }
-                    }
-                  }
-                }
-              }
-              callbacks.onDone();
-              return;
-            }
-            if (parsed.type === 'error') {
-              callbacks.onError(new Error(parsed.error?.message || 'OpenAI stream error'));
-              return;
+            // Usage (sent in the last chunk with stream_options)
+            if (parsed.usage) {
+              callbacks.onUsage({
+                inputTokens: parsed.usage.prompt_tokens || 0,
+                outputTokens: parsed.usage.completion_tokens || 0,
+              });
             }
           } catch {
             // skip malformed JSON

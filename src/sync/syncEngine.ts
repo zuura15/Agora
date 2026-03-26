@@ -28,7 +28,11 @@ export async function startSync(session: Session) {
         if (
           state.selectedModels !== prevState.selectedModels ||
           state.theme !== prevState.theme ||
-          state.judgeProvider !== prevState.judgeProvider
+          state.judgeProvider !== prevState.judgeProvider ||
+          state.responseLength !== prevState.responseLength ||
+          state.temperature !== prevState.temperature ||
+          state.autoJudge !== prevState.autoJudge ||
+          state.columnLayout !== prevState.columnLayout
         ) {
           pushPreferences(state, session);
         }
@@ -97,7 +101,7 @@ async function pullKeys(session: Session) {
 }
 
 async function pushPreferences(
-  state: { selectedModels: Record<string, string>; theme: string; judgeProvider: string | null },
+  state: { selectedModels: Record<string, string>; theme: string; judgeProvider: string | null; responseLength: string },
   session: Session
 ) {
   await supabase.from('preferences').upsert({
@@ -105,6 +109,7 @@ async function pushPreferences(
     selected_models: state.selectedModels,
     theme: state.theme,
     judge_provider: state.judgeProvider,
+    response_length: state.responseLength,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'user_id' });
 }
@@ -135,5 +140,9 @@ async function pullPreferences(session: Session) {
 
   if (data.judge_provider && !store.judgeProvider) {
     store.setJudgeProvider(data.judge_provider);
+  }
+
+  if (data.response_length && data.response_length !== store.responseLength) {
+    store.setResponseLength(data.response_length);
   }
 }

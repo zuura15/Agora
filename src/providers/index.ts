@@ -8,6 +8,11 @@ import { proxyStream } from '../proxy/proxyStream';
 import { useAppStore } from '../store/appStore';
 import { supabase } from '../lib/supabase';
 
+export interface ConversationTurn {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export type StreamFn = (
   apiKey: string,
   model: string,
@@ -15,6 +20,7 @@ export type StreamFn = (
   files: NormalizedFile[],
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
+  history?: ConversationTurn[],
 ) => Promise<void>;
 
 export type TestKeyFn = (apiKey: string) => Promise<boolean>;

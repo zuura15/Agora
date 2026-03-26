@@ -1,5 +1,7 @@
 import type { NormalizedFile } from '../lib/fileUtils';
 import { parseSSEStream, parseApiError, type StreamCallbacks } from '../lib/streamUtils';
+import { getResponseLengthConfig } from '../lib/responseLength';
+import type { ConversationTurn } from './index';
 
 const BASE_URL = 'https://api.anthropic.com/v1';
 
@@ -10,6 +12,7 @@ export async function streamAnthropic(
   files: NormalizedFile[],
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
+  history?: ConversationTurn[],
 ): Promise<void> {
   const content: Array<Record<string, unknown>> = [];
 
@@ -43,6 +46,25 @@ export async function streamAnthropic(
 
   content.push({ type: 'text', text: query });
 
+  const { systemPrompt, maxTokens, temperature } = getResponseLengthConfig();
+
+  const body: Record<string, unknown> = {
+    model,
+    max_tokens: maxTokens,
+    temperature,
+    stream: true,
+    messages: [
+      ...(history || []).map(turn => ({
+        role: turn.role,
+        content: turn.content,
+      })),
+      { role: 'user' as const, content },
+    ],
+  };
+  if (systemPrompt) {
+    body.system = systemPrompt;
+  }
+
   const response = await fetch(`${BASE_URL}/messages`, {
     method: 'POST',
     headers: {
@@ -51,12 +73,7 @@ export async function streamAnthropic(
       'anthropic-version': '2023-06-01',
       'anthropic-dangerous-direct-browser-access': 'true',
     },
-    body: JSON.stringify({
-      model,
-      max_tokens: 4096,
-      stream: true,
-      messages: [{ role: 'user', content }],
-    }),
+    body: JSON.stringify(body),
     signal,
   });
 

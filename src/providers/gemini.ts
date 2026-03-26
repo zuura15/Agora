@@ -1,5 +1,7 @@
 import type { NormalizedFile } from '../lib/fileUtils';
 import { parseApiError, type StreamCallbacks } from '../lib/streamUtils';
+import { getResponseLengthConfig } from '../lib/responseLength';
+import type { ConversationTurn } from './index';
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -10,6 +12,7 @@ export async function streamGemini(
   files: NormalizedFile[],
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
+  history?: ConversationTurn[],
 ): Promise<void> {
   const parts: Array<Record<string, unknown>> = [];
 
@@ -31,12 +34,26 @@ export async function streamGemini(
 
   const url = `${BASE_URL}/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
+  const { systemPrompt, maxTokens, temperature } = getResponseLengthConfig();
+
+  const body: Record<string, unknown> = {
+    contents: [
+      ...(history || []).map(turn => ({
+        role: turn.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: turn.content }],
+      })),
+      { role: 'user', parts },
+    ],
+    generationConfig: { maxOutputTokens: 4096, temperature },
+  };
+  if (systemPrompt) {
+    body.systemInstruction = { parts: [{ text: systemPrompt }] };
+  }
+
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts }],
-    }),
+    body: JSON.stringify(body),
     signal,
   });
 

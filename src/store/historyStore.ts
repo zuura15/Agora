@@ -33,6 +33,16 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
   setSearchQuery: (q) => set({ searchQuery: q }),
 
   loadSessions: async () => {
+    // Auto-clear old sessions
+    const autoClearDays = useAppStore.getState().autoClearDays;
+    if (autoClearDays) {
+      const cutoff = Date.now() - autoClearDays * 24 * 60 * 60 * 1000;
+      const old = await db.sessions.where('timestamp').below(cutoff).toArray();
+      if (old.length > 0) {
+        await db.sessions.where('timestamp').below(cutoff).delete();
+      }
+    }
+
     // Load local sessions first (fast)
     const localSessions = await db.sessions.orderBy('timestamp').reverse().toArray();
     set({ sessions: localSessions, loaded: true });

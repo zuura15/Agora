@@ -5,7 +5,7 @@ export interface NormalizedFile {
   filename: string;
 }
 
-const ACCEPTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.txt', '.md'];
+const ACCEPTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.txt', '.md', '.json', '.csv', '.xml', '.html', '.css', '.js', '.ts', '.py', '.yml', '.yaml', '.toml', '.log'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export function isAcceptedFile(file: File): boolean {
@@ -14,7 +14,7 @@ export function isAcceptedFile(file: File): boolean {
 }
 
 export function getAcceptString(): string {
-  return '.jpg,.jpeg,.png,.webp,.pdf,.txt,.md';
+  return ACCEPTED_EXTENSIONS.join(',');
 }
 
 export async function normalizeFile(file: File): Promise<NormalizedFile> {

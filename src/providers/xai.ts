@@ -1,5 +1,7 @@
 import { type NormalizedFile, extractTextFromPdf } from '../lib/fileUtils';
 import { parseSSEStream, parseApiError, type StreamCallbacks } from '../lib/streamUtils';
+import { getResponseLengthConfig } from '../lib/responseLength';
+import type { ConversationTurn } from './index';
 
 const BASE_URL = 'https://api.x.ai/v1';
 
@@ -10,39 +12,47 @@ export async function streamXAI(
   files: NormalizedFile[],
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
+  history?: ConversationTurn[],
 ): Promise<void> {
-  const content: Array<Record<string, unknown>> = [];
+  const { systemPrompt, temperature } = getResponseLengthConfig();
 
-  for (const file of files) {
-    if (file.type === 'image') {
-      content.push({
-        type: 'input_image',
-        image_url: `data:${file.mimeType};base64,${file.base64Data}`,
-      });
-    } else if (file.type === 'pdf') {
-      // xAI doesn't support PDF — extract text fallback
-      const text = await extractTextFromPdf(file);
-      content.push({
-        type: 'input_text',
-        text: `[Content from ${file.filename}]:\n${text}`,
-      });
-    } else if (file.type === 'text') {
-      const text = atob(file.base64Data);
-      content.push({
-        type: 'input_text',
-        text: `[Content from ${file.filename}]:\n${text}`,
-      });
+  // Use Chat Completions API for multi-turn support
+  const messages: Array<Record<string, unknown>> = [];
+
+  if (systemPrompt) {
+    messages.push({ role: 'system', content: systemPrompt });
+  }
+
+  if (history?.length) {
+    for (const turn of history) {
+      messages.push({ role: turn.role, content: turn.content });
     }
   }
 
-  content.push({ type: 'input_text', text: query });
+  // Build current user message
+  if (files.length > 0) {
+    const parts: Array<Record<string, unknown>> = [];
+    for (const file of files) {
+      if (file.type === 'image') {
+        parts.push({
+          type: 'image_url',
+          image_url: { url: `data:${file.mimeType};base64,${file.base64Data}` },
+        });
+      } else if (file.type === 'pdf') {
+        const text = await extractTextFromPdf(file);
+        parts.push({ type: 'text', text: `[Content from ${file.filename}]:\n${text}` });
+      } else if (file.type === 'text') {
+        const text = atob(file.base64Data);
+        parts.push({ type: 'text', text: `[Content from ${file.filename}]:\n${text}` });
+      }
+    }
+    parts.push({ type: 'text', text: query });
+    messages.push({ role: 'user', content: parts });
+  } else {
+    messages.push({ role: 'user', content: query });
+  }
 
-  const input = [{
-    role: 'user',
-    content,
-  }];
-
-  const response = await fetch(`${BASE_URL}/responses`, {
+  const response = await fetch(`${BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -50,8 +60,9 @@ export async function streamXAI(
     },
     body: JSON.stringify({
       model,
-      input,
+      messages,
       stream: true,
+      temperature,
     }),
     signal,
   });
@@ -64,14 +75,13 @@ export async function streamXAI(
   const reader = response.body!.getReader();
   parseSSEStream(reader, (data) => {
     const parsed = JSON.parse(data);
-    if (parsed.type === 'response.output_text.delta') {
-      return parsed.delta || null;
-    }
-    // Extract usage from completed event
-    if (parsed.type === 'response.completed' && parsed.response?.usage) {
+    const delta = parsed.choices?.[0]?.delta?.content;
+    if (typeof delta === 'string') return delta;
+    // Usage
+    if (parsed.usage) {
       callbacks.onUsage({
-        inputTokens: parsed.response.usage.input_tokens || 0,
-        outputTokens: parsed.response.usage.output_tokens || 0,
+        inputTokens: parsed.usage.prompt_tokens || 0,
+        outputTokens: parsed.usage.completion_tokens || 0,
       });
     }
     return null;
