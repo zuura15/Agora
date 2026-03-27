@@ -27,7 +27,7 @@ export function Home() {
   const apiKeys = useAppStore(s => s.apiKeys);
 
   const {
-    responses, conversation, isQuerying,
+    conversation, isQuerying,
     followUpMode, setFollowUpMode,
     followUpProviders, setFollowUpProviders,
     sendQuery, retryProvider, cancelAll, clearConversation,

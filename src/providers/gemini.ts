@@ -34,7 +34,7 @@ export async function streamGemini(
 
   const url = `${BASE_URL}/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
-  const { systemPrompt, maxTokens, temperature } = getResponseLengthConfig();
+  const { systemPrompt, temperature } = getResponseLengthConfig();
 
   const body: Record<string, unknown> = {
     contents: [

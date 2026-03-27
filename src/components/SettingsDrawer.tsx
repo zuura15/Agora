@@ -6,7 +6,6 @@ import { getTestKeyFn } from '../providers/index';
 import { useAuth } from '../auth/useAuth';
 import { LoginModal } from '../auth/LoginModal';
 import { useHistoryStore } from '../store/historyStore';
-import { db } from '../lib/dexie';
 
 type Tab = 'general' | 'display' | 'data' | 'account';
 
