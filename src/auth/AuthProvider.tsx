@@ -42,21 +42,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Fix: if URL hash has an empty or missing refresh_token param,
-    // remove the problematic param before Supabase tries to parse it.
-    // This prevents the "Invalid value" fetch error.
-    const hash = window.location.hash;
-    if (hash.includes('access_token')) {
-      const hashParams = new URLSearchParams(hash.substring(1));
-      const rt = hashParams.get('refresh_token');
-      if (!rt || rt === '') {
-        hashParams.delete('refresh_token');
-        window.location.hash = hashParams.toString();
-      }
-    }
-
-    // With detectSessionInUrl: true, Supabase will automatically
-    // process any #access_token in the URL hash on initialization.
+    // With detectSessionInUrl: true, Supabase automatically processes
+    // any #access_token in the URL hash during client initialization
+    // (which happens at import time, before this effect runs).
     // onAuthStateChange fires with SIGNED_IN when that completes.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       handleSession(session);
