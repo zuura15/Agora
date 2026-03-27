@@ -41,16 +41,24 @@ export function Home() {
   // Initialize model discovery
   useModelDiscovery();
 
-  // Redirect to setup if no keys configured — but wait for auth to finish
-  // so we don't strip OAuth callback tokens from the URL hash
-  const { isLoading: authLoading } = useAuthContext();
+  // Redirect to setup if no keys configured
+  const { isLoggedIn, isLoading: authLoading } = useAuthContext();
   useEffect(() => {
-    if (authLoading) return;
-    // Don't redirect if URL has OAuth callback tokens — let Supabase process them first
+    // FIRST: Never redirect during OAuth callback — tokens must be processed
     const hash = window.location.hash;
-    if (hash && (hash.includes('access_token') || hash.includes('error'))) return;
+    if (hash.includes('access_token') || hash.includes('refresh_token') || hash.includes('error')) {
+      return;
+    }
+
+    // SECOND: Wait for auth to finish loading
+    if (authLoading) return;
+
+    // THIRD: If logged in, don't redirect (keys may be syncing from cloud)
+    if (isLoggedIn) return;
+
+    // FOURTH: Redirect to setup only if truly no keys
     if (!hasAnyKey) navigate('/setup');
-  }, [hasAnyKey, navigate, authLoading]);
+  }, [hasAnyKey, navigate, authLoading, isLoggedIn]);
 
   // Load session from URL param
   useEffect(() => {
