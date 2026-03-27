@@ -7,13 +7,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Supabase credentials not configured. Auth features will be unavailable.');
 }
 
-// Use implicit flow so redirectTo works correctly across all environments.
-// This is appropriate for a client-side SPA with no server-side secret.
 export const supabase = createClient(
   supabaseUrl || '',
   supabaseAnonKey || '',
-  { auth: { flowType: 'implicit' } },
+  {
+    auth: {
+      flowType: 'implicit',
+      detectSessionInUrl: false, // We'll handle it manually
+    },
+  },
 );
-
-// The public URL where this app is hosted.
-export const APP_URL = import.meta.env.VITE_APP_URL || window.location.origin;
