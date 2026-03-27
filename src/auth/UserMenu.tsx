@@ -49,6 +49,7 @@ export function UserMenu() {
             src={avatarUrl}
             alt=""
             className="w-5 h-5 rounded-full"
+            referrerPolicy="no-referrer"
           />
         ) : (
           <div className="w-5 h-5 rounded-full bg-accent/30 flex items-center justify-center text-[10px] text-accent font-bold">

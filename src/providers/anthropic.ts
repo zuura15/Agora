@@ -86,7 +86,7 @@ export async function streamAnthropic(
   let inputTokens = 0;
   let outputTokens = 0;
 
-  parseSSEStream(reader, (data) => {
+  await parseSSEStream(reader, (data) => {
     const parsed = JSON.parse(data);
     // Capture usage from message_start
     if (parsed.type === 'message_start' && parsed.message?.usage) {
@@ -105,7 +105,17 @@ export async function streamAnthropic(
 }
 
 export async function testAnthropicKey(apiKey: string): Promise<boolean> {
-  // Use /v1/messages with max_tokens=1 to verify both auth and billing
+  // Use /v1/models to verify key without spending tokens
+  const modelsResponse = await fetch(`${BASE_URL}/models`, {
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+  });
+  if (modelsResponse.ok) return true;
+
+  // Fallback: try a minimal message to verify billing
   const response = await fetch(`${BASE_URL}/messages`, {
     method: 'POST',
     headers: {
@@ -115,7 +125,7 @@ export async function testAnthropicKey(apiKey: string): Promise<boolean> {
       'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1,
       messages: [{ role: 'user', content: 'hi' }],
     }),

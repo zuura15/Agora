@@ -77,16 +77,27 @@ export async function streamOpenAI(
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  let finished = false;
+
+  function done() {
+    if (finished) return;
+    finished = true;
+    callbacks.onDone();
+  }
+
+  await new Promise<void>((resolve) => {
 
   function pump(): void {
     if (signal?.aborted) {
       reader.cancel();
-      callbacks.onDone();
+      done();
+      resolve();
       return;
     }
-    reader.read().then(({ done, value }) => {
-      if (done) {
-        callbacks.onDone();
+    reader.read().then(({ done: readerDone, value }) => {
+      if (readerDone) {
+        done();
+        resolve();
         return;
       }
       buffer += decoder.decode(value, { stream: true });
@@ -97,7 +108,8 @@ export async function streamOpenAI(
         if (line.startsWith('data: ')) {
           const data = line.slice(6).trim();
           if (data === '[DONE]') {
-            callbacks.onDone();
+            done();
+            resolve();
             return;
           }
           try {
@@ -122,14 +134,16 @@ export async function streamOpenAI(
       pump();
     }).catch((err) => {
       if (signal?.aborted) {
-        callbacks.onDone();
+        done();
       } else {
         callbacks.onError(err instanceof Error ? err : new Error(String(err)));
       }
+      resolve();
     });
   }
 
   pump();
+  }); // close Promise wrapper
 }
 
 export async function testOpenAIKey(apiKey: string): Promise<boolean> {

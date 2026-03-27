@@ -40,18 +40,18 @@ export function LoginModal({ onClose }: Props) {
               {loading === 'google' ? '...' : 'Continue with Google'}
             </button>
             <button
-              onClick={() => handleLogin('github')}
-              disabled={!!loading}
-              className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-bg border border-border rounded-lg text-sm text-text-primary hover:border-accent/50 transition-colors disabled:opacity-50"
+              disabled
+              className="flex items-center justify-between w-full px-4 py-2.5 bg-bg border border-border rounded-lg text-sm text-text-secondary opacity-50 cursor-not-allowed"
             >
-              {loading === 'github' ? '...' : 'Continue with GitHub'}
+              Continue with GitHub
+              <span className="text-[10px] text-text-secondary/60">Coming soon</span>
             </button>
             <button
-              onClick={() => handleLogin('twitter')}
-              disabled={!!loading}
-              className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-bg border border-border rounded-lg text-sm text-text-primary hover:border-accent/50 transition-colors disabled:opacity-50"
+              disabled
+              className="flex items-center justify-between w-full px-4 py-2.5 bg-bg border border-border rounded-lg text-sm text-text-secondary opacity-50 cursor-not-allowed"
             >
-              {loading === 'twitter' ? '...' : 'Continue with X'}
+              Continue with X
+              <span className="text-[10px] text-text-secondary/60">Coming soon</span>
             </button>
           </div>
 

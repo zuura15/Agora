@@ -8,12 +8,25 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 let unsubscribe: (() => void) | null = null;
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+let syncing = false;
+
 export async function startSync(session: Session) {
+  // Prevent duplicate sync sessions
+  if (syncing) return;
+  syncing = true;
+
+  // Stop any existing subscription before starting fresh
+  if (unsubscribe) {
+    unsubscribe();
+    unsubscribe = null;
+  }
+
   // Pull cloud data on login
   await pullKeys(session);
   await pullPreferences(session);
 
   // Subscribe to local store changes and push to cloud
+  // This runs AFTER pulls, so pulled keys won't trigger a push-back
   unsubscribe = useAppStore.subscribe((state, prevState) => {
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
@@ -42,6 +55,7 @@ export async function startSync(session: Session) {
 }
 
 export function stopSync() {
+  syncing = false;
   if (unsubscribe) {
     unsubscribe();
     unsubscribe = null;
@@ -93,8 +107,8 @@ async function pullKeys(session: Session) {
 
   const store = useAppStore.getState();
   for (const [providerId, key] of Object.entries(keys)) {
-    // Only set keys that aren't already configured locally
-    if (!store.apiKeys[providerId] && key) {
+    // Cloud wins — update local with cloud value
+    if (key) {
       store.setApiKey(providerId, key);
     }
   }

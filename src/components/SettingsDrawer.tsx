@@ -410,7 +410,7 @@ function AccountTab() {
       {/* Profile */}
       <div className="flex items-center gap-2">
         {user?.user_metadata?.avatar_url && (
-          <img src={user.user_metadata.avatar_url} alt="" className="w-8 h-8 rounded-full" />
+          <img src={user.user_metadata.avatar_url} alt="" className="w-8 h-8 rounded-full" referrerPolicy="no-referrer" />
         )}
         <div>
           <p className="text-xs text-text-primary">{user?.user_metadata?.full_name || user?.email}</p>

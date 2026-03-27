@@ -65,7 +65,7 @@ export function ProviderCard({ providerId }: { providerId: string }) {
       </div>
 
       {warning && (
-        <div className="mb-3 p-2 rounded bg-amber-500/5 border border-amber-500/20 text-[11px] text-amber-400/80 leading-snug">
+        <div className="mb-3 p-2 rounded border text-[11px] leading-snug" style={{ backgroundColor: 'var(--theme-warning-bg)', borderColor: 'var(--theme-warning-border)', color: 'var(--theme-warning-text)' }}>
           {warning}
         </div>
       )}

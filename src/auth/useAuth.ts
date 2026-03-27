@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, APP_URL } from '../lib/supabase';
 import { useAuthContext } from './AuthProvider';
 
 type OAuthProvider = 'google' | 'github' | 'twitter';
@@ -11,7 +11,7 @@ export function useAuth() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: window.location.href,
+        redirectTo: APP_URL,
       },
     });
     if (error) throw error;

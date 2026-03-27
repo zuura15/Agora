@@ -12,6 +12,7 @@ import { ResponseColumn } from '../components/ResponseColumn';
 import { HistorySidebar } from '../components/HistorySidebar';
 import { SettingsDrawer } from '../components/SettingsDrawer';
 import { UserMenu } from '../auth/UserMenu';
+import { useAuthContext } from '../auth/AuthProvider';
 import type { NormalizedFile } from '../lib/fileUtils';
 import type { QuerySession } from '../lib/dexie';
 
@@ -40,10 +41,16 @@ export function Home() {
   // Initialize model discovery
   useModelDiscovery();
 
-  // Redirect to setup if no keys configured
+  // Redirect to setup if no keys configured — but wait for auth to finish
+  // so we don't strip OAuth callback tokens from the URL hash
+  const { isLoading: authLoading } = useAuthContext();
   useEffect(() => {
+    if (authLoading) return;
+    // Don't redirect if URL has OAuth callback tokens — let Supabase process them first
+    const hash = window.location.hash;
+    if (hash && (hash.includes('access_token') || hash.includes('error'))) return;
     if (!hasAnyKey) navigate('/setup');
-  }, [hasAnyKey, navigate]);
+  }, [hasAnyKey, navigate, authLoading]);
 
   // Load session from URL param
   useEffect(() => {

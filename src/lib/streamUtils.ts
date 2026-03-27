@@ -62,7 +62,15 @@ export function parseSSEStream(
   extractText: (data: string) => string | null,
   callbacks: StreamCallbacks,
   signal?: AbortSignal
-): void {
+): Promise<void> {
+  return new Promise<void>((resolve) => {
+  const originalOnDone = callbacks.onDone;
+  const originalOnError = callbacks.onError;
+  callbacks = {
+    ...callbacks,
+    onDone: () => { originalOnDone(); resolve(); },
+    onError: (err) => { originalOnError(err); resolve(); },
+  };
   const decoder = new TextDecoder();
   let buffer = '';
 
@@ -112,6 +120,7 @@ export function parseSSEStream(
   }
 
   pump();
+  }); // close Promise wrapper
 }
 
 export async function* parseSSEStreamAsync(

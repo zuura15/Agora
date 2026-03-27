@@ -24,27 +24,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [showMigration, setShowMigration] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    let loadingTimeout: ReturnType<typeof setTimeout>;
+    let resolved = false;
+
+    function markLoaded(newSession: Session | null) {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(loadingTimeout);
+      setSession(newSession);
       setIsLoading(false);
-      if (session) {
-        startSync(session);
+      if (newSession) {
+        startSync(newSession);
         checkMigration();
+      }
+    }
+
+    // Get existing session (fast path — from localStorage)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        markLoaded(session);
+      }
+      // If no session, wait for onAuthStateChange (handles OAuth callback)
+    });
+
+    // Listen for auth changes (handles OAuth callback, sign-out, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      markLoaded(session);
+      // Handle subsequent changes (sign-out, token refresh) after initial load
+      if (resolved) {
+        setSession(session);
+        if (session) {
+          startSync(session);
+        } else {
+          stopSync();
+        }
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setIsLoading(false);
-      if (session) {
-        startSync(session);
-        checkMigration();
-      } else {
-        stopSync();
+    // Fallback: if neither getSession nor onAuthStateChange resolves within 3s,
+    // stop loading anyway so the app doesn't hang
+    loadingTimeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        setIsLoading(false);
       }
-    });
+    }, 3000);
 
     return () => {
+      clearTimeout(loadingTimeout);
       subscription.unsubscribe();
       stopSync();
     };

@@ -21,7 +21,7 @@ export function Setup() {
           {isLoggedIn ? (
             <div className="flex items-center gap-2">
               {user?.user_metadata?.avatar_url && (
-                <img src={user.user_metadata.avatar_url} alt="" className="w-5 h-5 rounded-full" />
+                <img src={user.user_metadata.avatar_url} alt="" className="w-5 h-5 rounded-full" referrerPolicy="no-referrer" />
               )}
               <span className="text-xs text-text-secondary">{user?.user_metadata?.full_name || user?.email}</span>
               <button onClick={logout} className="text-xs text-text-secondary hover:text-text-primary transition-colors">Sign out</button>

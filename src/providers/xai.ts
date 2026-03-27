@@ -73,7 +73,7 @@ export async function streamXAI(
   }
 
   const reader = response.body!.getReader();
-  parseSSEStream(reader, (data) => {
+  await parseSSEStream(reader, (data) => {
     const parsed = JSON.parse(data);
     const delta = parsed.choices?.[0]?.delta?.content;
     if (typeof delta === 'string') return delta;
