@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../store/appStore';
 import { PROVIDER_IDS } from '../providers/capabilities';
+import { logger } from '../lib/logger';
 import type { Session } from '@supabase/supabase-js';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -11,19 +12,21 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let syncing = false;
 
 export async function startSync(session: Session) {
-  // Prevent duplicate sync sessions
-  if (syncing) return;
+  if (syncing) {
+    logger.sync.info('startSync skipped — already syncing');
+    return;
+  }
   syncing = true;
+  logger.sync.info('startSync', { userId: session.user.id, email: session.user.email });
 
-  // Stop any existing subscription before starting fresh
   if (unsubscribe) {
     unsubscribe();
     unsubscribe = null;
   }
 
-  // Pull cloud data on login
   await pullKeys(session);
   await pullPreferences(session);
+  logger.sync.info('initial pull complete');
 
   // Subscribe to local store changes and push to cloud
   // This runs AFTER pulls, so pulled keys won't trigger a push-back
@@ -67,10 +70,11 @@ export function stopSync() {
 }
 
 async function pushKeys(apiKeys: Record<string, string>, session: Session) {
+  const keyCount = Object.values(apiKeys).filter(Boolean).length;
+  logger.sync.info('pushKeys', { keyCount });
   for (const providerId of PROVIDER_IDS) {
     const key = apiKeys[providerId as string];
     if (key) {
-      // Encrypt via Edge Function
       await fetch(`${SUPABASE_URL}/functions/v1/encrypt-keys`, {
         method: 'POST',
         headers: {
@@ -92,7 +96,7 @@ async function pushKeys(apiKeys: Record<string, string>, session: Session) {
 }
 
 async function pullKeys(session: Session) {
-  // Decrypt via Edge Function
+  logger.sync.info('pullKeys — fetching from cloud');
   const response = await fetch(`${SUPABASE_URL}/functions/v1/encrypt-keys`, {
     method: 'GET',
     headers: {
@@ -100,10 +104,17 @@ async function pullKeys(session: Session) {
     },
   });
 
-  if (!response.ok) return;
+  if (!response.ok) {
+    logger.sync.error('pullKeys failed', { status: response.status, statusText: response.statusText });
+    return;
+  }
 
   const { keys } = await response.json() as { keys: Record<string, string> };
-  if (!keys) return;
+  if (!keys) {
+    logger.sync.info('pullKeys — no keys in cloud');
+    return;
+  }
+  logger.sync.info('pullKeys — received keys', { providers: Object.keys(keys) });
 
   const store = useAppStore.getState();
   for (const [providerId, key] of Object.entries(keys)) {

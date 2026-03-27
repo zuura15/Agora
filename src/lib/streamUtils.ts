@@ -1,4 +1,7 @@
+import { logger } from './logger';
+
 export function parseApiError(providerName: string, status: number, body: string): string {
+  logger.api.error(`${providerName} error`, { status, body: body.slice(0, 300) });
   try {
     const json = JSON.parse(body);
     const msg = json?.error?.message || json?.message || json?.error || null;

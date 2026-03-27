@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { supabase } from '../lib/supabase';
 import { startSync, stopSync } from '../sync/syncEngine';
 import { MigrationDialog } from './MigrationDialog';
+import { logger } from '../lib/logger';
 import type { User, Session } from '@supabase/supabase-js';
 
 interface AuthContextValue {
@@ -26,7 +27,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let resolved = false;
 
+    logger.auth.info('init', {
+      url: window.location.href.slice(0, 100),
+      hasHash: window.location.hash.length > 1,
+      hashPreview: window.location.hash.slice(0, 30),
+    });
+
     function handleSession(newSession: Session | null) {
+      logger.auth.info('handleSession', {
+        hasSession: !!newSession,
+        email: newSession?.user?.email,
+        alreadyResolved: resolved,
+      });
       setSession(newSession);
       if (!resolved) {
         resolved = true;
@@ -42,22 +54,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // With detectSessionInUrl: true, Supabase automatically processes
-    // any #access_token in the URL hash during client initialization
-    // (which happens at import time, before this effect runs).
-    // onAuthStateChange fires with SIGNED_IN when that completes.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      logger.auth.info('onAuthStateChange', { event: _event, hasSession: !!session });
       handleSession(session);
     });
 
-    // Also check for existing session (covers page refreshes)
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        logger.auth.error('getSession failed', { message: error.message });
+      } else {
+        logger.auth.info('getSession', { hasSession: !!session });
+      }
       handleSession(session);
     });
 
-    // Fallback timeout — don't hang forever
     const timeout = setTimeout(() => {
       if (!resolved) {
+        logger.auth.warn('timeout — marking as loaded without session');
         resolved = true;
         setIsLoading(false);
       }
