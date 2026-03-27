@@ -7,14 +7,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Supabase credentials not configured. Auth features will be unavailable.');
 }
 
-// In dev, use implicit flow so redirectTo works with any local URL.
-// In production, use PKCE (default) for better security.
-const isDev = import.meta.env.DEV;
-
+// Use implicit flow so redirectTo works correctly across all environments.
+// This is appropriate for a client-side SPA with no server-side secret.
 export const supabase = createClient(
   supabaseUrl || '',
   supabaseAnonKey || '',
-  isDev ? { auth: { flowType: 'implicit' } } : undefined,
+  { auth: { flowType: 'implicit' } },
 );
 
 // The public URL where this app is hosted.
