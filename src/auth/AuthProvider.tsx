@@ -39,8 +39,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    console.log('[Auth] init, hash:', window.location.hash.slice(0, 50), 'href:', window.location.href.slice(0, 80));
+
     // Get existing session (fast path — from localStorage)
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      console.log('[Auth] getSession:', session ? 'HAS SESSION' : 'no session', error ? `error: ${error.message}` : '');
       if (session) {
         markLoaded(session);
       }
@@ -49,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Listen for auth changes (handles OAuth callback, sign-out, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('[Auth] onAuthStateChange:', _event, session ? 'HAS SESSION' : 'no session');
       markLoaded(session);
       // Handle subsequent changes (sign-out, token refresh) after initial load
       if (resolved) {
