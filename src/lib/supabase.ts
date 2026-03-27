@@ -13,7 +13,7 @@ export const supabase = createClient(
   {
     auth: {
       flowType: 'implicit',
-      detectSessionInUrl: false, // We'll handle it manually
+      detectSessionInUrl: true,
     },
   },
 );

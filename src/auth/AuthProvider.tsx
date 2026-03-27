@@ -18,20 +18,6 @@ const AuthContext = createContext<AuthContextValue>({
   isLoading: true,
 });
 
-/**
- * Parse OAuth tokens from the URL hash (implicit flow).
- * Returns the access_token and refresh_token if present.
- */
-function extractTokensFromHash(): { accessToken: string; refreshToken: string } | null {
-  const hash = window.location.hash.substring(1);
-  if (!hash) return null;
-  const params = new URLSearchParams(hash);
-  const accessToken = params.get('access_token');
-  const refreshToken = params.get('refresh_token') || '';
-  if (!accessToken) return null;
-  return { accessToken, refreshToken };
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -40,76 +26,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let resolved = false;
 
-    function markLoaded(newSession: Session | null) {
-      if (resolved && !newSession) return; // Don't overwrite a session with null after resolved
-      resolved = true;
+    function handleSession(newSession: Session | null) {
       setSession(newSession);
-      setIsLoading(false);
-      if (newSession) {
-        startSync(newSession);
-        checkMigration();
-      }
-    }
-
-    async function init() {
-      // Step 1: Check if we have OAuth tokens in the URL hash
-      const tokens = extractTokensFromHash();
-      if (tokens) {
-        // Clear the hash immediately so it doesn't persist in the URL
-        window.history.replaceState(null, '', window.location.pathname);
-
-        // Set the session manually using the extracted tokens
-        const { data, error } = await supabase.auth.setSession({
-          access_token: tokens.accessToken,
-          refresh_token: tokens.refreshToken,
-        });
-
-        if (error) {
-          console.error('[Auth] setSession from hash failed:', error.message);
-        } else if (data.session) {
-          markLoaded(data.session);
-          return;
-        }
-      }
-
-      // Step 2: Check for existing session in localStorage
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        markLoaded(session);
-        return;
-      }
-
-      // Step 3: No session found — mark as loaded (not signed in)
-      markLoaded(null);
-    }
-
-    init();
-
-    // Listen for subsequent auth changes (sign-out, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
       if (!resolved) {
         resolved = true;
         setIsLoading(false);
       }
-      if (session) {
-        startSync(session);
+      if (newSession) {
+        startSync(newSession);
+        if (localStorage.getItem('agora_migration_done') !== 'true') {
+          setShowMigration(true);
+        }
       } else {
         stopSync();
       }
+    }
+
+    // Fix: if URL hash has an empty or missing refresh_token param,
+    // remove the problematic param before Supabase tries to parse it.
+    // This prevents the "Invalid value" fetch error.
+    const hash = window.location.hash;
+    if (hash.includes('access_token')) {
+      const hashParams = new URLSearchParams(hash.substring(1));
+      const rt = hashParams.get('refresh_token');
+      if (!rt || rt === '') {
+        hashParams.delete('refresh_token');
+        window.location.hash = hashParams.toString();
+      }
+    }
+
+    // With detectSessionInUrl: true, Supabase will automatically
+    // process any #access_token in the URL hash on initialization.
+    // onAuthStateChange fires with SIGNED_IN when that completes.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      handleSession(session);
     });
 
+    // Also check for existing session (covers page refreshes)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      handleSession(session);
+    });
+
+    // Fallback timeout — don't hang forever
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        setIsLoading(false);
+      }
+    }, 5000);
+
     return () => {
+      clearTimeout(timeout);
       subscription.unsubscribe();
       stopSync();
     };
   }, []);
-
-  function checkMigration() {
-    if (localStorage.getItem('agora_migration_done') !== 'true') {
-      setShowMigration(true);
-    }
-  }
 
   const value: AuthContextValue = {
     user: session?.user ?? null,
