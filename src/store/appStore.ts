@@ -171,13 +171,23 @@ export const useAppStore = create<AppState>((set, get) => ({
     logger.access.info('setQueryMode', { mode });
     localStorage.setItem('agora_query_mode', mode);
     const state = get();
+    const updates: Partial<AppState> = { queryMode: mode };
+
+    // Auto-switch to brief if entering access-code mode with normal response length
     if (mode === 'access-code' && state.responseLength === 'normal') {
       logger.access.info('setQueryMode — auto-switching to brief');
       localStorage.setItem('agora_response_length', 'brief');
-      set({ queryMode: mode, responseLength: 'brief' });
-    } else {
-      set({ queryMode: mode });
+      updates.responseLength = 'brief';
     }
+
+    // Auto-populate activeProviders from availableProviders when entering access-code mode
+    if (mode === 'access-code' && state.availableProviders.length > 0) {
+      const newActive = new Set(state.availableProviders.slice(0, 3));
+      logger.access.info('setQueryMode — auto-activating providers', { providers: Array.from(newActive) });
+      updates.activeProviders = newActive;
+    }
+
+    set(updates);
   },
 
   setAccessCodes: (codes) => {
@@ -191,7 +201,17 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setDailyQueryCount: (count) => set({ dailyQueryCount: count }),
 
-  setAvailableProviders: (ids) => set({ availableProviders: ids }),
+  setAvailableProviders: (ids) => {
+    logger.access.info('setAvailableProviders', { ids });
+    const state = get();
+    const updates: Partial<AppState> = { availableProviders: ids };
+    // If in access-code mode and no active providers set yet, auto-activate
+    if (state.queryMode === 'access-code' && (state.activeProviders.size === 0 || !Array.from(state.activeProviders).some(p => ids.includes(p)))) {
+      updates.activeProviders = new Set(ids.slice(0, 3));
+      logger.access.info('setAvailableProviders — auto-activating', { providers: ids.slice(0, 3) });
+    }
+    set(updates);
+  },
 
   setIsAdmin: (v) => set({ isAdmin: v }),
 
@@ -355,7 +375,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   closeSettings: () => set({ settingsOpen: false }),
 
   hasAnyKey: () => Object.keys(get().apiKeys).length > 0,
-  getConfiguredProviders: () => Object.keys(get().apiKeys),
+  getConfiguredProviders: () => {
+    const state = get();
+    if (state.queryMode === 'access-code' && state.availableProviders.length > 0) {
+      // In access-code mode, show available providers (from server) instead of BYOK keys
+      return state.availableProviders;
+    }
+    return Object.keys(state.apiKeys);
+  },
 
   clearAllData: () => {
     for (const id of PROVIDER_IDS) {
