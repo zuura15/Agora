@@ -144,7 +144,7 @@ export function Admin() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-surface border border-border rounded-lg p-4">
             <div className="text-[10px] uppercase tracking-wider text-text-secondary mb-1">Total Spend</div>
-            <div className="text-lg font-mono text-text-primary">${totalSpend.toFixed(2)}</div>
+            <div className="text-lg font-mono text-text-primary">${(Math.floor(totalSpend * 100) / 100).toFixed(2)}</div>
           </div>
           <div className="bg-surface border border-border rounded-lg p-4">
             <div className="text-[10px] uppercase tracking-wider text-text-secondary mb-1">Active Codes</div>
@@ -235,7 +235,7 @@ export function Admin() {
                           </td>
                           <td className="px-4 py-2 text-text-secondary">{code.redeemed_by || '—'}</td>
                           <td className="px-4 py-2 text-right font-mono">
-                            ${Number(code.remaining_credit).toFixed(2)} / ${Number(code.initial_credit).toFixed(2)}
+                            ${(Math.floor(Number(code.remaining_credit) * 100) / 100).toFixed(2)} / ${Number(code.initial_credit).toFixed(2)}
                           </td>
                           <td className="px-4 py-2 text-right font-mono text-text-secondary">
                             ${(code.usage?.total_cost || 0).toFixed(4)}

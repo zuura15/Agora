@@ -112,7 +112,7 @@ export function AccessCodeSection() {
               <span className="text-text-secondary">{code.code}</span>
               <div className="flex items-center gap-2">
                 <span className={code.remaining_credit <= 0 ? 'text-text-secondary' : 'text-text-primary'}>
-                  ${Number(code.remaining_credit).toFixed(2)}
+                  ${(Math.floor(Number(code.remaining_credit) * 100) / 100).toFixed(2)}
                 </span>
                 {getStatusBadge(code)}
               </div>

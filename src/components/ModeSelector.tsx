@@ -1,6 +1,10 @@
 import { useAppStore } from '../store/appStore';
 import type { QueryMode } from '../types/accessCode';
 
+function floorTo2(n: number): string {
+  return (Math.floor(n * 100) / 100).toFixed(2);
+}
+
 export function ModeSelector() {
   const queryMode = useAppStore(s => s.queryMode);
   const setQueryMode = useAppStore(s => s.setQueryMode);
@@ -46,7 +50,7 @@ export function ModeSelector() {
               : 'bg-surface/50 text-text-secondary hover:text-text-primary'
           }`}
         >
-          Access Code · <span className={balanceColor}>${totalBalance.toFixed(2)}</span>
+          Access Code · <span className={balanceColor}>${floorTo2(totalBalance)}</span>
         </button>
       </div>
       {queryMode === 'access-code' && (
