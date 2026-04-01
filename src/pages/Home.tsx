@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
 import { useProviders, type ResponseState } from '../hooks/useProviders';
@@ -155,6 +155,14 @@ export function Home() {
     : [];
 
   const columnLayout = useAppStore(s => s.columnLayout);
+  const latestEntryRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to latest query when conversation grows
+  useEffect(() => {
+    if (conversation.length > 0 && latestEntryRef.current) {
+      latestEntryRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [conversation.length]);
 
   // Responsive column count
   const getColumnClass = () => {
@@ -266,7 +274,7 @@ export function Home() {
                   const entryJudge = entryResponses.find(r => r.providerId === '__judge');
                   const entryList = entryResponses.filter(r => r.providerId !== '__judge');
                   return (
-                    <div key={entryIdx}>
+                    <div key={entryIdx} ref={entryIdx === conversation.length - 1 ? latestEntryRef : undefined}>
                       {/* Query label */}
                       <div className="px-1 pb-2">
                         <p className="text-xs text-text-secondary mb-0.5">
