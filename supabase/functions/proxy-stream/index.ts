@@ -129,7 +129,10 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     buildUrl: (model) => `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`,
     buildHeaders: (apiKey) => ({ 'Content-Type': 'application/json', 'x-goog-api-key': apiKey }),
     buildBody: (model, input, responseLength) => {
-      const maxTokens = responseLength === 'superbrief' ? 256 : responseLength === 'brief' ? 512 : 4096;
+      // Gemini 2.5 uses thinking tokens that count against maxOutputTokens,
+      // so we give it 4x the limit to compensate for internal reasoning overhead
+      const baseTokens = responseLength === 'superbrief' ? 256 : responseLength === 'brief' ? 512 : 4096;
+      const maxTokens = baseTokens * 4;
       // Convert from OpenAI-style input to Gemini format
       const contents = Array.isArray(input) ? input.map((msg: any) => ({
         role: msg.role === 'assistant' ? 'model' : 'user',
