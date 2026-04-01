@@ -196,10 +196,11 @@ RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_active_count integer;
 BEGIN
-  SELECT COUNT(*) INTO v_active_count
-  FROM access_codes
+  -- Lock rows and count (FOR UPDATE not allowed with COUNT aggregate)
+  PERFORM 1 FROM access_codes
   WHERE redeemed_by_user_id = p_user_id AND remaining_credit > 0 AND blocked = false
   FOR UPDATE;
+  GET DIAGNOSTICS v_active_count = ROW_COUNT;
 
   IF v_active_count >= 3 THEN
     RAISE EXCEPTION 'MAX_CODES_REACHED';
