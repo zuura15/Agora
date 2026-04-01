@@ -40,12 +40,10 @@ export function ProviderCard({ providerId }: { providerId: string }) {
     }
   };
 
-  const handleSave = () => {
-    if (keyInput.trim()) {
-      setApiKey(providerId, keyInput.trim());
-    } else {
-      removeApiKey(providerId);
-    }
+  const handleRemove = () => {
+    setKeyInput('');
+    removeApiKey(providerId);
+    setTestResult(null);
   };
 
   return (
@@ -83,7 +81,7 @@ export function ProviderCard({ providerId }: { providerId: string }) {
           disabled={!keyInput.trim() || testing}
           className="px-3 py-1.5 text-xs border border-border rounded hover:border-accent/50 text-text-secondary hover:text-text-primary transition-colors disabled:opacity-40"
         >
-          {testing ? '...' : 'Test'}
+          {testing ? '...' : 'Validate & Save'}
         </button>
       </div>
       <div className="flex gap-2 mb-2 text-[11px] text-text-secondary">
@@ -119,12 +117,12 @@ export function ProviderCard({ providerId }: { providerId: string }) {
         >
           Get your key {'\u2192'}
         </a>
-        {keyInput !== (apiKeys[providerId] || '') && (
+        {hasKey && (
           <button
-            onClick={handleSave}
-            className="text-[11px] text-accent hover:text-accent-hover transition-colors"
+            onClick={handleRemove}
+            className="text-[11px] text-error/70 hover:text-error transition-colors"
           >
-            Save
+            Remove
           </button>
         )}
       </div>

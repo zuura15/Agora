@@ -102,7 +102,7 @@ BEGIN
   END IF;
 
   INSERT INTO daily_usage (user_id, usage_date, query_count)
-  VALUES (p_user_id, CURRENT_DATE, 1)
+  VALUES (p_user_id, (now() AT TIME ZONE 'America/Los_Angeles')::date, 1)
   ON CONFLICT (user_id, usage_date)
   DO UPDATE SET query_count = daily_usage.query_count + 1
   WHERE daily_usage.query_count < v_daily_limit

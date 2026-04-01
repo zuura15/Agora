@@ -65,7 +65,8 @@ export async function fetchAccessStatus(session: Session): Promise<AccessCodeSta
   const activeCodes = codes.filter(c => !c.blocked && c.remaining_credit > 0);
   const totalBalance = activeCodes.reduce((sum, c) => sum + Number(c.remaining_credit), 0);
 
-  const today = new Date().toISOString().slice(0, 10);
+  // Use PST date to match server-side daily_usage partitioning
+  const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })).toISOString().slice(0, 10);
   const { data: dailyData, error: dailyError } = await supabase
     .from('daily_usage')
     .select('query_count')

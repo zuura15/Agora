@@ -26,7 +26,7 @@ export function ZeroBalanceBanner() {
   if (dailyQueryCount >= dailyQueryLimit) {
     return (
       <div className="flex items-center justify-center px-4 h-8 text-xs bg-warning-bg border-b border-warning-border text-warning-text shrink-0">
-        Daily query limit reached. Resets at midnight UTC.
+        Daily query limit reached. Resets at midnight PST.
       </div>
     );
   }

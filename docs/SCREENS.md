@@ -34,13 +34,13 @@ Every screen in the app with exact layout, components, states, and interactions.
 | +------------+  +------------+                           |
 | | OpenAI     |  | Anthropic  |                           |
 | | [key input]|  | [key input]|                           |
-| | [Test]     |  | [Test]     |                           |
+| | [Validate] |  | [Validate] |                           |
 | | Get key -> |  | Get key -> |                           |
 | +------------+  +------------+                           |
 | +------------+  +------------+                           |
 | | Gemini     |  | xAI (Grok) |                           |
 | | [key input]|  | [key input]|                           |
-| | [Test]     |  | [Test]     |                           |
+| | [Validate] |  | [Validate] |                           |
 | | Get key -> |  | Get key -> |                           |
 | +------------+  +------------+                           |
 |                                                          |
@@ -244,9 +244,11 @@ GENERAL TAB:
 +---------------------------+
 | API KEYS                  |
 | OpenAI    sk-...****      |
-|   [Test] [Show] [Copy]   |
+|   [Validate & Save]      |
+|   [Show] [Copy] [Remove] |
 | Anthropic sk-ant-...****  |
-|   [Test] [Show] [Copy]   |
+|   [Validate & Save]      |
+|   [Show] [Copy] [Remove] |
 | (etc.)                    |
 |                           |
 | MODELS                    |
@@ -423,6 +425,100 @@ No components, no state, no interactions (except external links and back link).
 |                  +-----------------------+                |
 +----------------------------------------------------------+
 ```
+
+---
+
+## Behavior & Rules
+
+Specifications that apply across screens. These are the details behind the user flows.
+
+### Access Code Mode Restrictions
+- Response length limited to **Brief** or **Super Brief** only. "Normal" is hidden from the selector.
+- Maximum **20 queries per day** per user. Resets at midnight PST.
+- All queries go through the server proxy (not direct browser-to-provider).
+- Privacy banner is hidden (since queries pass through the server).
+- Model selection restricted to a server-side allowlist per provider.
+- Maximum input size: 100KB. File uploads not supported.
+- Balance display floors to the lower cent (e.g., $4.9967 shows as $4.99).
+
+### Mode Selector Behavior
+- Only visible when signed in AND user has at least one active access code.
+- "Own Keys" button only appears if user has at least one BYOK key saved.
+- Switching modes clears the current conversation.
+- Switching to access-code mode auto-activates available providers (up to 3).
+- If entering access-code mode with "Normal" response length, auto-switches to "Brief".
+
+### Provider Selection
+- Maximum 3 active providers at once.
+- In BYOK mode: only providers with validated keys can be activated.
+- In access-code mode: only providers the server has keys for can be activated.
+- Provider chips show colored dots matching each provider's brand color.
+- Judge toggle ("J" button) appears on active provider chips.
+
+### Credit & Billing
+- Each query reserves $0.05 credit before any API calls are made.
+- After each provider responds, actual cost is calculated from real token usage and the reservation is settled (refund if actual < reserved, extra charge if actual > reserved).
+- Refunds are capped at the code's initial credit (can't exceed original amount).
+- If settlement fails (server error, disconnect), the reservation stands as the charge.
+- Daily query slot is consumed even if all providers fail (prevents retry abuse).
+- Balances are always set from server responses, never computed client-side.
+
+### API Key Validation
+- Keys can only be saved through successful validation ("Validate & Save" button).
+- There is no separate Save button.
+- Invalid keys show a red error and are not stored.
+- Saved keys are masked by default with Show/Copy/Remove options.
+
+### Access Code Input
+- Auto-formats as user types: `AGORA7X9KM2P4` becomes `AGORA-7X9K-M2P4`.
+- Pasting a code with dashes already present works as-is.
+- Input auto-uppercases all characters.
+- Maximum 3 active codes per user (active = has remaining credit and not blocked).
+
+### Authentication
+- Google OAuth only (GitHub and X shown as "Coming soon").
+- Session lasts ~1 hour before expiring.
+- Signing out does not delete BYOK keys (they're local).
+- Signing out disables access code features until re-sign-in.
+- When signed out with BYOK keys, a banner warns about no sync.
+
+### Admin Access
+- Single admin email, configured server-side.
+- "Admin" link appears in user dropdown only for the admin.
+- Non-admin users accessing `/admin` are silently redirected to `/`.
+- Admin can generate codes with any credit amount.
+- Admin can block/unblock codes immediately.
+- Code generation charset: `23456789ABCDEFGHJKMNPQRSTUVWXYZ` (no ambiguous characters).
+
+### History
+- Stored locally in the browser.
+- Optionally synced to cloud when signed in with sync enabled.
+- Searchable by query text.
+- Sessions can be deleted individually or all at once.
+- Auto-clear configurable: never, 7, 30, or 90 days.
+- Loading a past session shows static responses (not re-streamed).
+
+### Error Messages
+| Situation | Message shown |
+|-----------|--------------|
+| API key invalid | "Invalid API key" or "Authentication failed" (red, below input) |
+| Code not found | "Invalid code" (red, below input) |
+| Code already redeemed | "Already redeemed" (red) |
+| Code blocked | "Code is blocked" (red) |
+| Max 3 codes | "Maximum 3 active codes" (red) |
+| Credit depleted | "Access credit depleted" (red banner) + "Request More Access" link |
+| Daily limit hit | "Daily query limit reached. Resets at midnight PST." (yellow banner) |
+| Provider error | Provider-specific error in the response column + "Retry" button |
+| Not authenticated | "Not authenticated" or "Reservation failed" (red) |
+| Sign-in failed | Error message on callback page + "Back to setup" button |
+| Not signed in (keys banner) | "Using your own keys works even when not signed in. But your queries won't be synced." |
+
+### Responsive Behavior
+- Response columns: side by side on desktop (2-4 columns), stacked on mobile.
+- Column layout configurable: Auto, 1, 2, or 3 columns.
+- Mode selector: full text on desktop, compact on mobile.
+- Admin tables: horizontal scroll on mobile.
+- Settings drawer: max 90vw width on mobile.
 
 ---
 

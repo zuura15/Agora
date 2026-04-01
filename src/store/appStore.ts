@@ -152,7 +152,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   autoScroll: localStorage.getItem('agora_auto_scroll') !== 'false',
   columnLayout: (localStorage.getItem('agora_column_layout') as 'auto' | '1' | '2' | '3') || 'auto',
   autoClearDays: localStorage.getItem('agora_auto_clear_days') ? parseInt(localStorage.getItem('agora_auto_clear_days')!) : null,
-  historySyncEnabled: localStorage.getItem('agora_history_sync') === 'true',
+  historySyncEnabled: localStorage.getItem('agora_history_sync') !== 'false',
   proxyProviders: new Set(JSON.parse(localStorage.getItem('agora_proxy_providers') || '[]')),
   theme: (localStorage.getItem('agora_theme') as 'dark' | 'light') || 'dark',
   historyOpen: false,
@@ -218,7 +218,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   canSendAccessCodeQuery: () => {
     const { totalBalance, dailyQueryCount, dailyQueryLimit } = get();
     if (totalBalance <= 0) return { allowed: false, reason: 'Your access credit is depleted' };
-    if (dailyQueryCount >= dailyQueryLimit) return { allowed: false, reason: 'Daily query limit reached. Resets at midnight UTC.' };
+    if (dailyQueryCount >= dailyQueryLimit) return { allowed: false, reason: 'Daily query limit reached. Resets at midnight PST.' };
     return { allowed: true };
   },
 

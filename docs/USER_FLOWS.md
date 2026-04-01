@@ -1,389 +1,279 @@
 # Argeon — User Flows
 
-All user flows across every user type. Each flow describes the exact sequence of actions, screens, and system responses.
+Pure user journeys. What the user does, what happens next. No UI details or technical specs — those live in SCREENS.md.
 
 ---
 
 ## User Types
 
-| Type | Description | Auth Required | Has API Keys | Has Access Codes |
-|------|-------------|---------------|-------------|-----------------|
-| **Visitor** | First-time user, no account | No | No | No |
-| **BYOK User** | Brings own API keys, no account | No | Yes | No |
-| **BYOK + Signed In** | Has keys and an account | Yes | Yes | No |
-| **Access Code User** | Uses owner-provided credit | Yes | No | Yes |
-| **Hybrid User** | Has both own keys and access codes | Yes | Yes | Yes |
-| **Admin** | App owner (single email) | Yes | Yes | Yes |
+| Type | Description | Sign-in needed? |
+|------|-------------|-----------------|
+| **Visitor** | First-time user, no account | No |
+| **BYOK User** | Uses their own API keys, no account | No |
+| **Access Code User** | Received a code from the admin | Yes |
+| **Hybrid User** | Has both own keys and an access code | Yes |
+| **Admin** | App owner who generates and manages codes | Yes |
 
 ---
 
-## Flow 1: First Visit (Visitor)
+## Flow 1: First Visit
 
-**Entry:** User opens the app URL for the first time.
+**Prerequisite:** None
+**Screen:** Setup Page (Screen 1)
 
-1. App checks `localStorage` for API keys → none found
-2. App checks auth state → not logged in
-3. **Redirect to `/setup`** (forced, since no keys and not logged in)
-4. Setup page renders in **light mode**
-5. User sees:
-   - "Set up your AI providers" title
-   - **"Have an access code?"** section at top with "Sign in to use an access code" button
-   - 4 provider cards (OpenAI, Anthropic, Gemini, xAI) with key input fields
-   - "Start using Argeon" button (disabled)
-   - "Sign in to sync across devices" link (top-right)
+A new user opens Argeon for the first time. They're taken to a setup page where they have three paths:
 
-**Exit paths:**
-- Enter API key(s) → Flow 2
-- Click "Sign in to use an access code" → Flow 5
-- Click "Sign in to sync across devices" → Flow 4 (then return here)
+- **Add their own API keys** — see Flow 2
+- **Redeem an access code** — they sign in first (Flow 4), then type the code they received, click Redeem, and they're in
+- **Just sign in** — to sync data from another device (Flow 4)
 
 ---
 
-## Flow 2: BYOK Setup (No Account)
+## Flow 2: Setting Up Own API Keys
 
-**Entry:** Visitor on `/setup` page.
+**Prerequisite:** Flow 1
+**Screen:** Setup Page (Screen 1)
 
-1. User clicks "Get your key" link on a provider card → opens provider's API key dashboard
-2. User copies their API key
-3. User pastes key into the provider card input field
-4. User clicks "Save" on the provider card
-5. Key is saved to `localStorage` under `agora_key_{provider}`
-6. Provider chip appears (colored dot + name)
-7. If at least 1 key saved: "Start using Argeon" button enables
-8. User clicks "Start using Argeon"
-9. **Navigate to `/` (Home page)**
-10. User sees: Header with "Argeon" title, provider chips, query input, empty state
+The user wants to use their own API keys.
 
-**Notes:**
-- No account required. Keys live in browser only.
-- Max 3 providers active simultaneously (can toggle in query input)
-- Privacy banner visible: "Your queries go directly from your browser to the AI providers"
+1. They pick a provider (e.g., OpenAI) and click the link to get an API key
+2. They come back with the key and paste it in
+3. They click "Validate & Save" — the app checks if the key works
+4. If it works, the key is saved. If not, they see an error and can try again
+5. They repeat for as many providers as they want (up to 4)
+6. Once at least one key is saved, they can enter the app
+
+No sign-in required for this path.
 
 ---
 
-## Flow 3: Sending a Query (BYOK Mode)
+## Flow 3: Sending a Query (Own Keys)
 
-**Entry:** Home page with at least 1 API key configured, BYOK mode.
+**Prerequisite:** Flow 2
+**Screen:** Home Page (Screen 2)
 
-1. User types question in the textarea
-2. "Ask All" button enables
-3. User presses Enter (or clicks "Ask All")
-4. Query dispatched to all active providers in parallel (direct browser → provider API)
-5. Response columns appear with:
-   - Provider name + model
-   - Streaming text (with blinking cursor)
-   - Elapsed time counter
-6. As each provider finishes:
-   - Streaming cursor disappears
-   - Time + tokens + cost shown in header
-   - Copy/Retry/Continue buttons appear in footer
-7. If Judge mode enabled: judge response appears after all providers complete
-8. Follow-up mode auto-enables
-9. Session saved to IndexedDB history
+The user has their own keys and wants to ask a question.
 
-**Error handling:**
-- Provider API error → red error message in that column with "Retry" button
-- Network error → error message with retry
-- All providers fail → all columns show errors
+1. They type a question and hit Enter
+2. All their active providers answer at the same time
+3. Responses stream in live, side by side (stacked on mobile)
+4. After the responses finish, they can copy any response, retry one, or continue the conversation with a specific provider
+5. Follow-up mode kicks in automatically — they can keep asking related questions with full context
+
+Their queries go directly from their browser to each provider.
 
 ---
 
-## Flow 4: Sign In (OAuth)
+## Flow 4: Signing In
 
-**Entry:** User clicks any "Sign in" button (setup page, settings, access code section).
+**Prerequisite:** None
+**Screen:** Login Modal (Screen 7) → Auth Callback (Screen 6)
 
-1. LoginModal opens (centered overlay)
-2. User sees: "Sign in to Argeon" with Google/GitHub/X buttons (only Google active)
-3. User clicks "Continue with Google"
-4. Browser redirects to Supabase Auth → Google OAuth consent screen
-5. User authorizes with Google
-6. Google redirects back to Supabase → Supabase redirects to `/auth/callback`
-7. AuthCallback page:
-   - Shows "Signing in..."
-   - Processes the OAuth tokens
-   - On success: redirects to `/`
-   - On error: shows "Sign-in failed" with "Back to setup" button
-8. On successful auth:
-   - User avatar appears in header (replaces "Sign in" text)
-   - Cloud sync starts (pulls keys, preferences, history if enabled)
-   - MigrationDialog may appear (if local data exists, asking to sync)
-   - Admin check runs in background
+The user decides to sign in (from any sign-in button in the app).
+
+1. They click "Sign in" and choose Google
+2. They authorize on Google's screen
+3. They're returned to Argeon, now signed in
+4. Everything syncs to the cloud automatically in the background — keys, settings, and history work across devices
+
+Signing in is optional for BYOK users. It's required for access codes.
 
 ---
 
-## Flow 5: Access Code Redemption
+## Flow 5: Redeeming an Access Code (Existing User)
 
-**Entry:** User has received an access code from the admin (e.g., `AGORA-7X9K-M2P4`).
+**Prerequisite:** Flow 4
+**Screen:** Settings Drawer (Screen 4, Account tab)
 
-### 5a: From Setup Page (not signed in)
-1. User sees "Have an access code?" section
-2. Clicks "Sign in to use an access code" button
-3. LoginModal opens → completes OAuth (Flow 4)
-4. After sign-in, code input field appears (replaces sign-in button)
-5. User types code (auto-formats: typing `AGORA7X9KM2P4` becomes `AGORA-7X9K-M2P4`)
-6. User clicks "Redeem" (or presses Enter)
-7. **Success:** "Code redeemed!" message + "Start using Argeon" button
-8. User clicks "Start using Argeon"
-9. App switches to access-code mode, navigates to Home
+An existing user who is already signed in receives a code and wants to redeem it.
 
-### 5b: From Settings (already signed in)
-1. User opens Settings → Account tab
-2. Scrolls to "ACCESS CODES" section
-3. Types code in input field
-4. Clicks "Redeem"
-5. **Success:** Code appears in active codes list with balance
-6. Mode selector appears in header
+1. They open Settings → Account
+2. They type the code (dashes fill in automatically)
+3. They click "Redeem"
+4. The code appears in their active codes list with a balance
+5. The mode selector appears in the header so they can switch to Access Code mode
 
-### Error states:
-- "Invalid code" → code doesn't exist in database
-- "Already redeemed" → another user already used this code
-- "Code is blocked" → admin disabled this code
-- "Maximum 3 active codes" → user already has 3 active codes
+If the code is invalid, already used by someone else, blocked, or they already have 3 active codes, they see an error and can try again.
 
 ---
 
-## Flow 6: Sending a Query (Access Code Mode)
+## Flow 6: Sending a Query (Access Code)
 
-**Entry:** Home page, access-code mode selected, balance > $0, daily limit not reached.
+**Prerequisite:** Flow 1 (new user code redemption) or Flow 5 (existing user)
+**Screen:** Home Page (Screen 2)
 
-1. Header shows mode selector: `[Own Keys] [Access Code · $4.99]` with `0/20` count
-2. Provider chips show all available providers (from server, not BYOK keys)
-3. Response length restricted to Brief or Super Brief (Normal hidden)
-4. Privacy banner hidden (queries go through proxy, not direct)
-5. User types question and presses Enter
-6. **Pre-query:** Client calls `reserve-query` Edge Function
-   - Server reserves $0.05 credit, claims daily query slot
-   - Returns `query_group_id`, updated balance, query count
-   - Balance and count update in header immediately
-7. Query dispatched to all active providers via `proxy-stream` Edge Function
-   - Server uses owner's API keys (user's keys not needed)
-   - Server enforces: model allowlist, max tokens, input size limit, response length
-8. Each provider streams response through the proxy
-   - Client parses SSE (handles OpenAI, Anthropic, Gemini, xAI formats)
-   - After stream: server settles actual cost, sends `argeon:balance` event
-   - Header balance updates from server response
-9. Rate limit counter increments: `1/20`
+The user has a code with credit remaining and is in Access Code mode.
 
-**Blocked states:**
-- Balance $0.00: "Access credit depleted" banner, "Request More Access" mailto link, query input disabled
-- 20/20 queries: "Daily query limit reached. Resets at midnight UTC." banner, query input disabled
-- Both states allow switching to "Own Keys" mode if user has BYOK keys
+1. They type a question and hit Enter
+2. All available providers answer (they don't need their own keys)
+3. Responses stream in, and a small amount of credit is deducted for each
+4. Their remaining balance and daily query count update after each query
+
+They get 20 queries per day and responses are limited to shorter lengths to conserve credit.
 
 ---
 
-## Flow 7: Mode Switching
+## Flow 7: Switching Between Modes
 
-**Entry:** Home page, user has both BYOK keys and access codes.
+**Prerequisite:** Flow 2 + Flow 5
+**Screen:** Home Page (Screen 2, header)
 
-### BYOK → Access Code:
-1. User clicks "Access Code · $X.XX" in mode selector
-2. Store updates: `queryMode = 'access-code'`
-3. If response length was "Normal", auto-switches to "Brief"
-4. Active providers populate from `availableProviders` (server-reported)
-5. Privacy banner hides
-6. Conversation clears (prevents confusion about which mode funded it)
-
-### Access Code → BYOK:
-1. User clicks "Own Keys" in mode selector
-2. Store updates: `queryMode = 'byok'`
-3. Active providers revert to those with BYOK keys
-4. Privacy banner shows
-5. "Normal" response length option reappears in Settings
-6. Conversation clears
+A user has both their own keys and an access code. They can switch between the two modes anytime using a toggle in the header. Switching clears the current conversation. If they only have access codes, there's no toggle — they're always in Access Code mode.
 
 ---
 
-## Flow 8: Auto-Mode for Access-Code-Only Users
+## Flow 8: Running Out of Credit
 
-**Entry:** User signs in, redeems a code, has no BYOK keys.
+**Prerequisite:** Flow 6
+**Screen:** Home Page (Screen 2, banner)
 
-1. After redeeming, user clicks "Start using Argeon" → navigates to `/`
-2. Home page detects: `hasActiveCodes && !hasAnyKey && queryMode === 'byok'`
-3. Auto-switches to `access-code` mode
-4. Mode selector shows only "Access Code · $X.XX" (no "Own Keys" button since no BYOK keys)
-5. All available providers auto-activated
+The user's credit runs out. They're told their credit is depleted and can request more from the admin. If they have their own keys, they can switch to using those. They can also redeem another code if they have one.
 
 ---
 
-## Flow 9: Follow-Up Query
+## Flow 9: Hitting the Daily Limit
 
-**Entry:** After initial query completes (any mode).
+**Prerequisite:** Flow 6
+**Screen:** Home Page (Screen 2, banner)
 
-1. Follow-up mode auto-enables
-2. Textarea placeholder changes to "Ask a follow-up..."
-3. Provider picker chip appears inside input showing active count
-4. "New chat" button appears
-5. User types follow-up question and sends
-6. Conversation history passed to each provider for context
-7. New response columns appear below previous ones
-8. In access-code mode: new reservation required per follow-up
+The user has sent 20 queries today. They're told the limit resets at midnight PST. If they have their own keys, they can switch to those and keep going.
 
 ---
 
-## Flow 10: Retry Failed Provider
+## Flow 10: Follow-Up Questions
 
-**Entry:** A provider column shows an error.
+**Prerequisite:** Flow 3 or Flow 6
+**Screen:** Home Page (Screen 2)
 
-### BYOK mode:
-1. User clicks "Retry" in the error column
-2. Same query re-sent to that single provider with BYOK key
-3. New streaming response replaces the error
-
-### Access Code mode:
-1. User clicks "Retry"
-2. New reservation made ($0.05 for single provider)
-3. Query re-sent through proxy
-4. Balance deducted for the retry
+After getting responses, the user can ask follow-up questions. Each provider remembers the conversation context. They can also start a fresh conversation anytime. In Access Code mode, each follow-up uses a new query slot.
 
 ---
 
-## Flow 11: View/Manage History
+## Flow 11: Retrying a Failed Response
 
-**Entry:** Home page.
+**Prerequisite:** Flow 3 or Flow 6
+**Screen:** Home Page (Screen 2, response column)
 
-1. User clicks clock icon in header → History sidebar opens
-2. Sidebar shows all saved sessions (most recent first)
-3. User can:
-   - **Search** by query text (filters in real-time)
-   - **Click** a session to load it (responses shown as static, non-streaming)
-   - **Delete** a session (hover to reveal X button)
-   - **Clear all** history (button at bottom, with confirmation)
-4. Loading a session updates URL to `/s/{sessionId}`
-5. Click clock icon again to close sidebar
+If a provider fails to respond, the user can retry just that one provider. The other responses stay. In Access Code mode, a retry uses a new query slot.
 
 ---
 
-## Flow 12: Settings Management
+## Flow 12: Viewing Query History
 
-**Entry:** Home page, click gear icon.
+**Prerequisite:** Flow 3 or Flow 6
+**Screen:** Home Page (Screen 2, sidebar)
 
-1. Settings drawer slides in from right
-2. 4 tabs: General | Display | Data | Account
-
-### General tab:
-- View/edit API keys per provider (test, show/hide, copy, remove)
-- Select model per provider (dropdown of discovered models)
-- Response length (Normal/Brief/Super Brief — Normal hidden in access-code mode)
-- Temperature slider (0.0 — 1.0)
-- Auto-judge toggle
-- Send shortcut (Enter or Ctrl+Enter)
-
-### Display tab:
-- Theme (Dark/Light)
-- Column layout (Auto/1/2/3)
-- Render markdown toggle
-- Show cost toggle
-- Show tokens toggle
-- Auto-scroll toggle
-
-### Data tab:
-- Auto-clear history (Never/7/30/90 days)
-- Export history as JSON
-- Clear All Data (with confirmation — destructive)
-
-### Account tab (not signed in):
-- "Sign in to sync..." info text
-- Sign in button
-- Access code section (sign-in button)
-
-### Account tab (signed in):
-- Profile (avatar + name + email)
-- "API keys and preferences are syncing" notice
-- History sync toggle
-- Server proxy toggles (OpenAI, xAI)
-- Access code section (input + active codes list)
-- Sign out button
+The user can open a sidebar to see all their past queries. They can search, click to reload a past conversation, or delete sessions. History is stored locally and optionally synced to the cloud.
 
 ---
 
-## Flow 13: Admin — Generate Access Code
+## Flow 13: Changing Settings
 
-**Entry:** Admin navigates to `/admin` (link in user dropdown menu).
+**Prerequisite:** Flow 2 or Flow 5
+**Screen:** Settings Drawer (Screen 4)
 
-1. Admin page verifies identity via `admin-codes` Edge Function
-2. If not admin email: redirected to `/`
-3. Dashboard shows:
-   - Stats: Total Spend, Active Codes, Total Users
-   - Generate section: credit amount input (default $5) + Generate button
-4. Admin sets credit amount (any value, e.g., $5, $10, $0.50)
-5. Clicks "Generate"
-6. Server creates code: `AGORA-XXXX-XXXX` (charset: `23456789ABCDEFGHJKMNPQRSTUVWXYZ`)
-7. Code displayed with "Copy" button
-8. Admin copies and sends to the user (via email, message, etc.)
+The user can open settings to manage their API keys, choose models, adjust response length and temperature, change the theme, configure display options, manage history, and handle their account (sign in/out, sync, access codes).
 
 ---
 
-## Flow 14: Admin — Monitor Usage
+## Flow 14: Signing Out
 
-**Entry:** Admin on `/admin` page.
+**Prerequisite:** Flow 4
+**Screen:** Home Page (Screen 2, user menu)
 
-1. **Codes table** shows all generated codes:
-   - Code, Status (unused/active/depleted/blocked), User email, Balance/Initial, Spent, Created date
-2. Click a code row to expand: per-provider breakdown (cost, tokens per provider)
-3. **Per-user table**: email, total spend, query count
-4. **Per-provider table**: provider name, total cost, total tokens
+The user signs out. If they have their own keys, the app keeps working — their keys are stored locally. They see a note that queries won't be synced. If they have no keys at all, they're sent back to setup. Access code features stop working until they sign back in.
 
 ---
 
-## Flow 15: Admin — Block/Unblock Code
+## Flow 15: Admin — Generating a Code
 
-**Entry:** Admin on `/admin` page.
+**Prerequisite:** Flow 4 (admin account)
+**Screen:** Admin Page (Screen 3)
 
-1. Admin clicks "Block" on a code row
-2. Code status changes to "blocked" immediately
-3. If user is mid-query: current stream completes, reservation already charged
-4. User's next query attempt fails: "No credit remaining" (if this was their only active code)
-5. User sees the code as "blocked" in Settings → Account → Access Codes list
-6. Admin can click "Unblock" to re-enable
+The admin opens the admin dashboard, sets a credit amount, and generates a code. They copy the code and share it with someone (via email, message, etc.).
 
 ---
 
-## Flow 16: Sign Out
+## Flow 16: Admin — Monitoring Usage
 
-**Entry:** User clicks "Sign out" in user dropdown or Settings → Account.
+**Prerequisite:** Flow 15
+**Screen:** Admin Page (Screen 3)
 
-1. Supabase session cleared
-2. If BYOK keys exist: user stays on Home, queries continue working (keys are local)
-3. Banner shows: "Using your own keys works even when not signed in. But your queries won't be synced."
-4. If no BYOK keys and no access codes: redirected to `/setup`
-5. Access code features disabled (mode selector hidden, access code state cleared)
-6. Admin link removed from dropdown
+The admin can see every code they've generated: who redeemed it, how much credit remains, how much was spent, and a breakdown by provider. They can also see per-user and per-provider spending totals.
 
 ---
 
-## Flow 17: Balance Depletion
+## Flow 17: Admin — Blocking a Code
 
-**Entry:** User's total credit across all active codes reaches $0.
+**Prerequisite:** Flow 15
+**Screen:** Admin Page (Screen 3)
 
-1. Balance in header shows `$0.00` in red
-2. Red banner appears: "Access credit depleted · Request More Access"
-3. "Request More Access" opens mailto link
-4. Query input blocked in access-code mode
-5. User can:
-   - Switch to "Own Keys" mode (if they have BYOK keys)
-   - Redeem another access code (up to 3 active)
-   - Contact admin for a new code
+The admin can block any code, which immediately prevents the user from sending more queries with it. They can unblock it later. If the user was mid-query when blocked, that query finishes but no more are allowed.
 
 ---
 
-## Flow 18: Daily Rate Limit
+## Flow 18: Continue in Provider
 
-**Entry:** User sends their 20th query of the day (UTC).
+**Prerequisite:** Flow 3 or Flow 6
+**Screen:** Home Page (Screen 2, response column)
 
-1. Rate limit display shows `20/20` in red
-2. Yellow banner: "Daily query limit reached. Resets at midnight UTC."
-3. Query input blocked in access-code mode
-4. User can still switch to "Own Keys" mode
-5. Limit resets at midnight UTC automatically
+After getting a response, the user can choose to continue the conversation directly in that provider's own chat interface. The conversation is copied to their clipboard and the provider's site opens in a new tab.
 
 ---
 
-## Flow 19: Continue in Provider
+## Flow 19: Judge Mode (parked)
 
-**Entry:** A response column has completed.
+Not exposed to users yet. The feature exists in code but needs a clearer product direction before surfacing.
 
-1. User clicks "Continue in {Provider}" button in response footer
-2. Confirmation dialog appears with the response text (for copying)
-3. "Copy & Open" button copies the conversation to clipboard
-4. Opens the provider's chat URL in a new tab
-5. User pastes the conversation to continue directly with that provider
+---
+
+## Negative Flows
+
+### Sign-in fails
+
+**Prerequisite:** Flow 4 attempted
+**Screen:** Auth Callback (Screen 6)
+
+The user tries to sign in but cancels on Google's screen or Google returns an error. They see an error page and can go back to setup. Nothing is saved or changed.
+
+### API key is invalid
+
+**Prerequisite:** Flow 2 attempted
+**Screen:** Setup Page (Screen 1)
+
+The user pastes a key and clicks "Validate & Save". The validation fails and they see an error message. The key is not saved. They can fix it and try again.
+
+### Query fails for some providers
+
+**Prerequisite:** Flow 3 or Flow 6 attempted
+**Screen:** Home Page (Screen 2, response columns)
+
+One or more providers fail to respond (bad key, outage, rate limit, network issue). The failed columns show error messages. The successful ones still show their responses. The user can retry the failed ones.
+
+### Access code redemption fails
+
+**Prerequisite:** Flow 1 or Flow 5 attempted
+**Screen:** Setup Page (Screen 1) or Settings Drawer (Screen 4, Account tab)
+
+The user enters a code and it doesn't work. They see a specific error: invalid code, already redeemed by someone else, blocked by admin, or they already have 3 active codes. The input stays filled so they can correct and retry.
+
+### Query fails in Access Code mode
+
+**Prerequisite:** Flow 6 attempted
+**Screen:** Home Page (Screen 2)
+
+The user sends a query but something goes wrong. If the server can't be reached, they see a reservation error. If providers fail after the reservation, the daily query slot is used but credit is partially refunded. They can retry or switch to their own keys.
+
+### Session expires
+
+**Prerequisite:** Flow 4 completed
+**Screen:** Any screen requiring authentication
+
+After about an hour, the sign-in session expires silently. The next action that needs authentication will fail. The user just needs to sign in again. Their local data is unaffected.
+
+### Admin page access denied
+
+**Prerequisite:** Flow 4 completed (non-admin user)
+**Screen:** Admin Page (Screen 3) → redirects to Home Page (Screen 2)
+
+A non-admin user tries to access the admin page directly. They're quietly redirected to the main page. No error shown.

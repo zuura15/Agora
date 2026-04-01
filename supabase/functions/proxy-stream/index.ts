@@ -173,8 +173,11 @@ serve(async (req) => {
     });
   }
 
+  console.log('[proxy-stream] request received');
+
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) {
+    console.error('[proxy-stream] missing auth header');
     return new Response(JSON.stringify({ error: 'Missing authorization' }), {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -186,6 +189,7 @@ serve(async (req) => {
   const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
   if (authError || !user) {
+    console.error('[proxy-stream] auth failed', { error: authError?.message, hasUser: !!user });
     return new Response(JSON.stringify({ error: 'Invalid token' }), {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -194,6 +198,7 @@ serve(async (req) => {
 
   const body = await req.json();
   const { provider_id, model, input, access_code_mode, query_group_id, active_code_id, request_id, response_length } = body;
+  console.log('[proxy-stream]', { provider_id, model, access_code_mode, query_group_id: query_group_id?.substring(0, 8), request_id: request_id?.substring(0, 8), response_length });
   // Server computes estimated cost per provider — never trust client
   const RESERVATION_AMOUNT = 0.05;
   const MAX_PROVIDERS = 4;
@@ -209,8 +214,10 @@ serve(async (req) => {
   let apiKey: string;
 
   if (access_code_mode) {
+    console.log('[proxy-stream] access-code mode — validating reservation');
     // Validate reservation exists and belongs to this user
     if (!query_group_id || !active_code_id) {
+      console.error('[proxy-stream] missing reservation data');
       return new Response(JSON.stringify({ error: 'Missing reservation data' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -250,8 +257,10 @@ serve(async (req) => {
     }
 
     // Access code mode: use owner's key
+    console.log('[proxy-stream] reservation validated, using owner key for', provider_id);
     const ownerKey = OWNER_KEYS[provider_id];
     if (!ownerKey) {
+      console.error('[proxy-stream] no owner key for', provider_id);
       return new Response(JSON.stringify({ error: `Provider ${provider_id} not available` }), {
         status: 501,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -313,14 +322,18 @@ serve(async (req) => {
 
   // Forward request to provider
   const url = config.buildUrl(model, apiKey);
+  console.log('[proxy-stream] forwarding to provider', { provider_id, model, url: url.substring(0, 60) });
   const providerResponse = await fetch(url, {
     method: 'POST',
     headers: config.buildHeaders(apiKey),
     body: JSON.stringify(config.buildBody(model, input, response_length)),
   });
 
+  console.log('[proxy-stream] provider response', { provider_id, status: providerResponse.status });
+
   if (!providerResponse.ok) {
     const errorText = await providerResponse.text();
+    console.error('[proxy-stream] provider error', { provider_id, status: providerResponse.status, error: errorText.substring(0, 200) });
     return new Response(errorText, {
       status: providerResponse.status,
       headers: { ...corsHeaders, 'Content-Type': 'text/plain' },
@@ -353,6 +366,7 @@ serve(async (req) => {
         if (done) {
           // Settlement: calculate cost and adjust reservation
           const cost = estimateCost(model, usage);
+          console.log('[proxy-stream] stream done, settling', { provider_id, usage, cost, estimated: RESERVATION_AMOUNT / MAX_PROVIDERS });
           try {
             const { data: newBalance } = await supabase.rpc('settle_usage', {
               p_user_id: user!.id,
@@ -394,7 +408,7 @@ serve(async (req) => {
             controller.enqueue(encoder.encode(balanceEvent));
           } catch (err) {
             // Settlement failed — reservation stands. Log but don't fail the stream.
-            console.error('Settlement failed:', err);
+            console.error('[proxy-stream] settlement failed', { provider_id, err });
           }
 
           controller.close();
