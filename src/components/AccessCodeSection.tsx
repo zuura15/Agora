@@ -61,7 +61,20 @@ export function AccessCodeSection() {
         <input
           type="text"
           value={codeInput}
-          onChange={e => { setCodeInput(e.target.value.toUpperCase()); setError(null); }}
+          onChange={e => {
+            const raw = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            // If pasting a full code with dashes, just clean and use it
+            if (e.target.value.includes('-')) {
+              setCodeInput(e.target.value.toUpperCase());
+            } else {
+              // Auto-insert dashes: AGORA-XXXX-XXXX
+              let formatted = raw;
+              if (raw.length > 5) formatted = raw.slice(0, 5) + '-' + raw.slice(5);
+              if (raw.length > 9) formatted = raw.slice(0, 5) + '-' + raw.slice(5, 9) + '-' + raw.slice(9, 13);
+              setCodeInput(formatted);
+            }
+            setError(null);
+          }}
           placeholder="AGORA-XXXX-XXXX"
           className="flex-1 bg-bg border border-border rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-accent/50 placeholder:text-text-secondary/50"
           onKeyDown={e => e.key === 'Enter' && handleRedeem()}
