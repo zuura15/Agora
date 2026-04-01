@@ -8,7 +8,7 @@ import { LoginModal } from '../auth/LoginModal';
 import { useHistoryStore } from '../store/historyStore';
 import { AccessCodeSection } from './AccessCodeSection';
 
-type Tab = 'general' | 'display' | 'data' | 'account';
+type Tab = 'general' | 'display' | 'data' | 'account' | 'about';
 
 export function SettingsDrawer() {
   const settingsOpen = useAppStore(s => s.settingsOpen);
@@ -22,6 +22,7 @@ export function SettingsDrawer() {
     { id: 'display', label: 'Display' },
     { id: 'data', label: 'Data' },
     { id: 'account', label: 'Account' },
+    { id: 'about', label: 'About' },
   ];
 
   return (
@@ -57,6 +58,7 @@ export function SettingsDrawer() {
           {activeTab === 'display' && <DisplayTab />}
           {activeTab === 'data' && <DataTab />}
           {activeTab === 'account' && <AccountTab />}
+          {activeTab === 'about' && <AboutTab />}
         </div>
       </div>
     </>
@@ -456,6 +458,64 @@ function AccountTab() {
       >
         Sign out
       </button>
+    </div>
+  );
+}
+
+// ── About Tab ──
+
+function AboutTab() {
+  return (
+    <div className="space-y-5 text-xs text-text-secondary leading-relaxed">
+      <div>
+        <h3 className="text-sm font-display font-semibold text-text-primary mb-2">Argeon</h3>
+        <p>
+          Ask one question, get answers from multiple AI models side by side. Compare responses from OpenAI, Anthropic, Google Gemini, and xAI in real time.
+        </p>
+      </div>
+
+      <div>
+        <h4 className="text-[11px] font-semibold text-text-primary mb-1">Features</h4>
+        <ul className="space-y-1">
+          <li>Query up to 4 AI providers simultaneously</li>
+          <li>Stream responses in real time, side by side</li>
+          <li>Follow-up conversations with full context</li>
+          <li>Upload images, PDFs, and text files with your queries</li>
+          <li>Judge mode: have one AI evaluate the others</li>
+          <li>Works with your own API keys or access codes</li>
+          <li>Full query history with search</li>
+          <li>Dark and light themes</li>
+        </ul>
+      </div>
+
+      <div>
+        <h4 className="text-[11px] font-semibold text-text-primary mb-1">Privacy</h4>
+        <p className="mb-2">
+          When using your own keys, queries go directly from your browser to each AI provider. Argeon never sees, stores, or processes your queries on our servers.
+        </p>
+        <p className="mb-2">
+          When using access codes, queries are routed through our server to use shared API keys. We log token usage and costs for billing purposes but do not store your query content.
+        </p>
+        <p>
+          API keys are stored in your browser. If you sign in, they are encrypted and synced to the cloud so they work across your devices.
+        </p>
+      </div>
+
+      <div>
+        <h4 className="text-[11px] font-semibold text-text-primary mb-1">Data You Control</h4>
+        <ul className="space-y-1">
+          <li>Your API keys: stored locally, optionally synced (encrypted)</li>
+          <li>Query history: stored locally, optionally synced</li>
+          <li>Settings: stored locally, synced on sign-in</li>
+          <li>You can delete everything from Settings → Data → Clear All Data</li>
+        </ul>
+      </div>
+
+      <div className="pt-2 border-t border-border">
+        <a href="/privacy" className="text-accent hover:text-accent-hover transition-colors">
+          Full Privacy Policy
+        </a>
+      </div>
     </div>
   );
 }
