@@ -61,7 +61,7 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     buildUrl: () => 'https://api.openai.com/v1/responses',
     buildHeaders: (apiKey) => ({ 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` }),
     buildBody: (model, input, responseLength) => {
-      const maxTokens = responseLength === 'superbrief' ? 512 : responseLength === 'brief' ? 1024 : 4096;
+      const maxTokens = responseLength === 'superbrief' ? 256 : responseLength === 'brief' ? 512 : 4096;
       return { model, input, stream: true, max_output_tokens: maxTokens };
     },
     extractUsage: (data, acc) => {
@@ -78,7 +78,7 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     buildUrl: () => 'https://api.x.ai/v1/responses',
     buildHeaders: (apiKey) => ({ 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` }),
     buildBody: (model, input, responseLength) => {
-      const maxTokens = responseLength === 'superbrief' ? 512 : responseLength === 'brief' ? 1024 : 4096;
+      const maxTokens = responseLength === 'superbrief' ? 256 : responseLength === 'brief' ? 512 : 4096;
       return { model, input, stream: true, max_output_tokens: maxTokens };
     },
     extractUsage: (data, acc) => {
@@ -99,7 +99,7 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
       'anthropic-version': '2023-06-01',
     }),
     buildBody: (model, input, responseLength) => {
-      const maxTokens = responseLength === 'superbrief' ? 512 : responseLength === 'brief' ? 1024 : 4096;
+      const maxTokens = responseLength === 'superbrief' ? 256 : responseLength === 'brief' ? 512 : 4096;
       // Convert from OpenAI-style input to Anthropic messages format
       const messages = Array.isArray(input) ? input.map((msg: any) => ({
         role: msg.role,
@@ -129,7 +129,7 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     buildUrl: (model) => `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`,
     buildHeaders: (apiKey) => ({ 'Content-Type': 'application/json', 'x-goog-api-key': apiKey }),
     buildBody: (model, input, responseLength) => {
-      const maxTokens = responseLength === 'superbrief' ? 512 : responseLength === 'brief' ? 1024 : 4096;
+      const maxTokens = responseLength === 'superbrief' ? 256 : responseLength === 'brief' ? 512 : 4096;
       // Convert from OpenAI-style input to Gemini format
       const contents = Array.isArray(input) ? input.map((msg: any) => ({
         role: msg.role === 'assistant' ? 'model' : 'user',

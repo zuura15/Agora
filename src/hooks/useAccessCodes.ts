@@ -12,6 +12,7 @@ export function useAccessCodes() {
   const setAvailableProviders = useAppStore(s => s.setAvailableProviders);
   const setIsAdmin = useAppStore(s => s.setIsAdmin);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const adminChecked = useRef(false);
 
   const refresh = useCallback(async () => {
     if (!session) {
@@ -44,10 +45,13 @@ export function useAccessCodes() {
     }
     logger.access.info('useAccessCodes — logged in, initializing', { email: session.user?.email });
     refresh();
-    checkAdmin(session).then(isAdmin => {
-      logger.admin.info('useAccessCodes — isAdmin', { isAdmin });
-      setIsAdmin(isAdmin);
-    });
+    if (!adminChecked.current) {
+      adminChecked.current = true;
+      checkAdmin(session).then(isAdmin => {
+        logger.admin.info('useAccessCodes — isAdmin', { isAdmin });
+        setIsAdmin(isAdmin);
+      });
+    }
   }, [isLoggedIn, session, refresh, setIsAdmin]);
 
   // Poll every 60s when in access-code mode
