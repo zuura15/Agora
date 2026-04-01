@@ -90,10 +90,11 @@ export async function proxyStream(
     throw new Error(parseApiError('Proxy', response.status, error));
   }
 
-  // Parse SSE stream
+  // Parse SSE stream (handles OpenAI, Anthropic, Gemini, xAI formats)
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  let anthropicInputTokens = 0;
 
   function pump(): void {
     if (signal?.aborted) {
@@ -119,6 +120,8 @@ export async function proxyStream(
           }
           try {
             const parsed = JSON.parse(data);
+
+            // OpenAI / xAI format
             if (parsed.type === 'response.output_text.delta' && typeof parsed.delta === 'string') {
               callbacks.onToken(parsed.delta);
             }
@@ -130,9 +133,36 @@ export async function proxyStream(
                   outputTokens: resp.usage.output_tokens || 0,
                 });
               }
-              callbacks.onDone();
-              return;
             }
+
+            // Anthropic format
+            if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
+              callbacks.onToken(parsed.delta.text);
+            }
+            if (parsed.type === 'message_start' && parsed.message?.usage) {
+              anthropicInputTokens = parsed.message.usage.input_tokens || 0;
+            }
+            if (parsed.type === 'message_delta' && parsed.usage) {
+              callbacks.onUsage({
+                inputTokens: anthropicInputTokens,
+                outputTokens: parsed.usage.output_tokens || 0,
+              });
+            }
+            if (parsed.type === 'message_stop') {
+              // Anthropic stream end — don't call onDone here, let argeon:balance or [DONE] handle it
+            }
+
+            // Gemini format
+            if (parsed.candidates?.[0]?.content?.parts?.[0]?.text) {
+              callbacks.onToken(parsed.candidates[0].content.parts[0].text);
+            }
+            if (parsed.usageMetadata) {
+              callbacks.onUsage({
+                inputTokens: parsed.usageMetadata.promptTokenCount || 0,
+                outputTokens: parsed.usageMetadata.candidatesTokenCount || 0,
+              });
+            }
+
             // Access code balance update
             if (parsed.type === 'argeon:balance') {
               const store = useAppStore.getState();
@@ -143,6 +173,8 @@ export async function proxyStream(
                 store.setDailyQueryCount(parsed.queries_today);
               }
             }
+
+            // Error
             if (parsed.type === 'error') {
               callbacks.onError(new Error(parsed.error?.message || 'Proxy stream error'));
               return;
