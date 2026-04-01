@@ -94,8 +94,6 @@ function GeneralTab() {
   const setResponseLength = useAppStore(s => s.setResponseLength);
   const temperature = useAppStore(s => s.temperature);
   const setTemperature = useAppStore(s => s.setTemperature);
-  const autoJudge = useAppStore(s => s.autoJudge);
-  const setAutoJudge = useAppStore(s => s.setAutoJudge);
   const sendKey = useAppStore(s => s.sendKey);
   const setSendKey = useAppStore(s => s.setSendKey);
   const queryMode = useAppStore(s => s.queryMode);
@@ -189,13 +187,7 @@ function GeneralTab() {
         </p>
       </div>
 
-      {/* Auto Judge */}
-      <Toggle
-        value={autoJudge}
-        onChange={setAutoJudge}
-        label="Auto-judge"
-        desc="Automatically run judge after every query"
-      />
+      {/* Auto Judge — parked, not exposed to users yet */}
 
       {/* Send Key */}
       <div>
@@ -526,38 +518,51 @@ function SettingsKeyRow({ providerId }: { providerId: string }) {
   const apiKeys = useAppStore(s => s.apiKeys);
   const setApiKey = useAppStore(s => s.setApiKey);
   const removeApiKey = useAppStore(s => s.removeApiKey);
+  const [keyInput, setKeyInput] = useState(apiKeys[providerId] || '');
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
   const [testError, setTestError] = useState('');
   const hasKey = !!apiKeys[providerId];
+  const isDirty = keyInput !== (apiKeys[providerId] || '');
 
   const handleCopy = () => {
-    if (apiKeys[providerId]) {
-      navigator.clipboard.writeText(apiKeys[providerId]);
+    const key = apiKeys[providerId] || keyInput;
+    if (key) {
+      navigator.clipboard.writeText(key);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     }
   };
 
-  const handleTest = async () => {
-    const key = apiKeys[providerId];
-    if (!key) return;
+  const handleValidateAndSave = async () => {
+    if (!keyInput.trim()) return;
     setTesting(true);
     setTestResult(null);
     setTestError('');
     try {
       const testFn = getTestKeyFn(providerId);
-      const ok = await testFn(key);
-      setTestResult(ok ? 'success' : 'error');
-      if (!ok) setTestError('Invalid key or API error');
+      const ok = await testFn(keyInput.trim());
+      if (ok) {
+        setTestResult('success');
+        setApiKey(providerId, keyInput.trim());
+      } else {
+        setTestResult('error');
+        setTestError('Invalid key or API error');
+      }
     } catch (err) {
       setTestResult('error');
       setTestError(err instanceof Error ? err.message : 'Connection failed');
     } finally {
       setTesting(false);
     }
+  };
+
+  const handleRemove = () => {
+    setKeyInput('');
+    removeApiKey(providerId);
+    setTestResult(null);
   };
 
   return (
@@ -568,34 +573,33 @@ function SettingsKeyRow({ providerId }: { providerId: string }) {
         {hasKey && testResult === 'success' && (
           <span className="text-[10px] text-success ml-auto">{'\u2713'} Connected</span>
         )}
-        {hasKey && testResult !== 'success' && (
-          <span className="text-[10px] text-text-secondary ml-auto">Configured</span>
+        {hasKey && !isDirty && testResult !== 'success' && (
+          <span className="text-[10px] text-text-secondary ml-auto">Saved</span>
+        )}
+        {isDirty && (
+          <span className="text-[10px] text-warning-text ml-auto">Unsaved</span>
         )}
       </div>
       <div className="flex gap-2 mb-1">
         <input
           type={showKey ? 'text' : 'password'}
-          value={apiKeys[providerId] || ''}
-          onChange={e => {
-            if (e.target.value) setApiKey(providerId, e.target.value);
-            else removeApiKey(providerId);
-            setTestResult(null);
-          }}
+          value={keyInput}
+          onChange={e => { setKeyInput(e.target.value); setTestResult(null); }}
           placeholder={PROVIDERS[providerId].keyPlaceholder}
           className="flex-1 bg-bg border border-border rounded px-2 py-1 text-xs text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent/50 font-mono"
         />
-        {hasKey && (
+        {keyInput.trim() && (isDirty || !hasKey) && (
           <button
-            onClick={handleTest}
+            onClick={handleValidateAndSave}
             disabled={testing}
-            className="px-2 py-1 text-[10px] border border-border rounded hover:border-accent/50 text-text-secondary hover:text-text-primary transition-colors disabled:opacity-40"
+            className="px-2 py-1 text-[10px] bg-accent text-white rounded hover:bg-accent-hover transition-colors disabled:opacity-40 whitespace-nowrap"
           >
-            {testing ? '...' : 'Test'}
+            {testing ? '...' : 'Validate & Save'}
           </button>
         )}
         {hasKey && (
           <button
-            onClick={() => removeApiKey(providerId)}
+            onClick={handleRemove}
             className="text-[10px] text-error/60 hover:text-error transition-colors px-2"
           >
             Remove
@@ -605,15 +609,19 @@ function SettingsKeyRow({ providerId }: { providerId: string }) {
       {testResult === 'error' && (
         <p className="text-[10px] text-error mb-1">{testError}</p>
       )}
-      {hasKey && (
+      {(hasKey || keyInput) && (
         <div className="flex gap-2 text-[11px] text-text-secondary">
           <button onClick={() => setShowKey(v => !v)} className="hover:text-text-primary transition-colors">
             {showKey ? 'Hide' : 'Show'}
           </button>
-          <span className="text-border">|</span>
-          <button onClick={handleCopy} className="hover:text-text-primary transition-colors">
-            {copied ? 'Copied!' : 'Copy'}
-          </button>
+          {(hasKey || keyInput) && (
+            <>
+              <span className="text-border">|</span>
+              <button onClick={handleCopy} className="hover:text-text-primary transition-colors">
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
