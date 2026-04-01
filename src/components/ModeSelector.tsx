@@ -55,7 +55,7 @@ export function ModeSelector() {
       </div>
       {queryMode === 'access-code' && (
         <span className={`text-[10px] font-mono ${rateLimitColor}`}>
-          {dailyQueryCount}/{dailyQueryLimit}
+          {dailyQueryCount}/{dailyQueryLimit} used · {dailyQueryLimit - dailyQueryCount} remaining
         </span>
       )}
     </div>
