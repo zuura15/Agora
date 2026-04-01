@@ -69,7 +69,7 @@ serve(async (req) => {
     console.log('[reserve-query] calling reserve_query RPC for user', user.id);
     const { data, error } = await supabase.rpc('reserve_query', {
       p_user_id: user.id,
-      p_estimated_cost: 0.50,
+      p_estimated_cost: 0.05,
     });
 
     if (error) {

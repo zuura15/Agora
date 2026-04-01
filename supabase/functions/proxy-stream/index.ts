@@ -195,7 +195,7 @@ serve(async (req) => {
   const body = await req.json();
   const { provider_id, model, input, access_code_mode, query_group_id, active_code_id, request_id, response_length } = body;
   // Server computes estimated cost per provider — never trust client
-  const RESERVATION_AMOUNT = 0.50;
+  const RESERVATION_AMOUNT = 0.05;
   const MAX_PROVIDERS = 4;
 
   const config = PROVIDER_CONFIGS[provider_id];
