@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { parseApiError, type StreamCallbacks } from '../lib/streamUtils';
+import { logger } from '../lib/logger';
 import type { NormalizedFile } from '../lib/fileUtils';
 import { extractTextFromPdf } from '../lib/fileUtils';
 import type { ConversationTurn } from '../providers/index';
@@ -87,8 +88,11 @@ export async function proxyStream(
 
   if (!response.ok) {
     const error = await response.text();
+    logger.stream.error(`proxyStream ${providerId} — HTTP ${response.status}`, error.substring(0, 200));
     throw new Error(parseApiError('Proxy', response.status, error));
   }
+
+  logger.stream.info(`proxyStream ${providerId} — streaming started`);
 
   // Parse SSE stream (handles OpenAI, Anthropic, Gemini, xAI formats)
   const reader = response.body!.getReader();
@@ -104,6 +108,7 @@ export async function proxyStream(
     }
     reader.read().then(({ done, value }) => {
       if (done) {
+        logger.stream.info(`proxyStream ${providerId} — stream done`);
         callbacks.onDone();
         return;
       }
@@ -120,6 +125,7 @@ export async function proxyStream(
           }
           try {
             const parsed = JSON.parse(data);
+            logger.stream.info(`proxyStream ${providerId} — SSE event`, { type: parsed.type || 'gemini', hasCandidate: !!parsed.candidates });
 
             // OpenAI / xAI format
             if (parsed.type === 'response.output_text.delta' && typeof parsed.delta === 'string') {
