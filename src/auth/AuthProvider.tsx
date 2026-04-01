@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { startSync, stopSync } from '../sync/syncEngine';
-import { MigrationDialog } from './MigrationDialog';
 import { logger } from '../lib/logger';
 import type { User, Session } from '@supabase/supabase-js';
 
@@ -22,7 +21,6 @@ const AuthContext = createContext<AuthContextValue>({
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [showMigration, setShowMigration] = useState(false);
 
   useEffect(() => {
     let resolved = false;
@@ -46,8 +44,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       if (newSession) {
         startSync(newSession);
+        // Auto-migrate silently — no dialog
         if (localStorage.getItem('agora_migration_done') !== 'true') {
-          setShowMigration(true);
+          localStorage.setItem('agora_migration_done', 'true');
         }
       } else {
         stopSync();
@@ -93,7 +92,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={value}>
       {children}
-      {showMigration && <MigrationDialog onClose={() => setShowMigration(false)} />}
     </AuthContext.Provider>
   );
 }
