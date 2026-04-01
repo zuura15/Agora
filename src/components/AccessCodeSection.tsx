@@ -1,12 +1,15 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
 import { useAuthContext } from '../auth/AuthProvider';
 import { useAccessCodes } from '../hooks/useAccessCodes';
 import { LoginModal } from '../auth/LoginModal';
 
 export function AccessCodeSection() {
+  const navigate = useNavigate();
   const { isLoggedIn } = useAuthContext();
   const accessCodes = useAppStore(s => s.accessCodes);
+  const setQueryMode = useAppStore(s => s.setQueryMode);
   const { redeem } = useAccessCodes();
   const [codeInput, setCodeInput] = useState('');
   const [isRedeeming, setIsRedeeming] = useState(false);
@@ -26,7 +29,6 @@ export function AccessCodeSection() {
     if (result.success) {
       setSuccess(true);
       setCodeInput('');
-      setTimeout(() => setSuccess(false), 3000);
     } else {
       setError(result.error || 'Failed to redeem code');
     }
@@ -90,7 +92,17 @@ export function AccessCodeSection() {
 
       {/* Feedback */}
       {error && <p className="text-[11px] text-error">{error}</p>}
-      {success && <p className="text-[11px] text-success">Code redeemed successfully!</p>}
+      {success && (
+        <div className="flex items-center gap-3">
+          <p className="text-[11px] text-success">Code redeemed!</p>
+          <button
+            onClick={() => { setQueryMode('access-code'); navigate('/'); }}
+            className="px-3 py-1.5 text-xs bg-accent text-white rounded hover:bg-accent-hover transition-colors"
+          >
+            Start using Argeon
+          </button>
+        </div>
+      )}
 
       {/* Active codes list */}
       {accessCodes.length > 0 && (
