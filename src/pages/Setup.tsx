@@ -1,17 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PROVIDER_IDS } from '../providers/capabilities';
 import { ProviderCard } from '../components/ProviderCard';
 import { useAppStore } from '../store/appStore';
 import { useAuth } from '../auth/useAuth';
 import { LoginModal } from '../auth/LoginModal';
+import { AccessCodeSection } from '../components/AccessCodeSection';
 
 export function Setup() {
   const navigate = useNavigate();
   const apiKeys = useAppStore(s => s.apiKeys);
+  const accessCodes = useAppStore(s => s.accessCodes);
   const hasAnyKey = Object.keys(apiKeys).length > 0;
+  const hasActiveCodes = accessCodes.some(c => !c.blocked && c.remaining_credit > 0);
   const { isLoggedIn, user, logout } = useAuth();
   const [showLogin, setShowLogin] = useState(false);
+
+  // Setup page uses light mode by default
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', 'light');
+    return () => {
+      // Restore user's theme preference when leaving setup
+      const saved = localStorage.getItem('agora_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', saved);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
@@ -46,6 +59,12 @@ export function Setup() {
           </p>
         </div>
 
+        {/* Access Code section — on top */}
+        <div className="mb-8 p-4 bg-surface border border-border rounded-lg">
+          <h2 className="text-sm font-display font-semibold text-text-primary mb-3">Have an access code?</h2>
+          <AccessCodeSection />
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
           {PROVIDER_IDS.map(id => (
             <ProviderCard key={id} providerId={id} />
@@ -55,7 +74,7 @@ export function Setup() {
         <div className="text-center">
           <button
             onClick={() => navigate('/')}
-            disabled={!hasAnyKey}
+            disabled={!hasAnyKey && !hasActiveCodes}
             className="px-6 py-2.5 bg-accent text-white rounded-lg text-sm font-semibold hover:bg-accent-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Start using Argeon

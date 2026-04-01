@@ -8,6 +8,8 @@ const COLORS: Record<string, string> = {
   Stream: '#f59e0b',
   API: '#3b82f6',
   App: '#8b5cf6',
+  Access: '#ec4899',
+  Admin: '#f97316',
 };
 
 function log(module: string, level: LogLevel, message: string, data?: unknown) {
@@ -51,6 +53,16 @@ export const logger = {
     info: (msg: string, data?: unknown) => log('App', 'info', msg, data),
     warn: (msg: string, data?: unknown) => log('App', 'warn', msg, data),
     error: (msg: string, data?: unknown) => log('App', 'error', msg, data),
+  },
+  access: {
+    info: (msg: string, data?: unknown) => log('Access', 'info', msg, data),
+    warn: (msg: string, data?: unknown) => log('Access', 'warn', msg, data),
+    error: (msg: string, data?: unknown) => log('Access', 'error', msg, data),
+  },
+  admin: {
+    info: (msg: string, data?: unknown) => log('Admin', 'info', msg, data),
+    warn: (msg: string, data?: unknown) => log('Admin', 'warn', msg, data),
+    error: (msg: string, data?: unknown) => log('Admin', 'error', msg, data),
   },
 };
 

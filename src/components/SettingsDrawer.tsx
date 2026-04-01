@@ -6,6 +6,7 @@ import { getTestKeyFn } from '../providers/index';
 import { useAuth } from '../auth/useAuth';
 import { LoginModal } from '../auth/LoginModal';
 import { useHistoryStore } from '../store/historyStore';
+import { AccessCodeSection } from './AccessCodeSection';
 
 type Tab = 'general' | 'display' | 'data' | 'account';
 
@@ -95,6 +96,7 @@ function GeneralTab() {
   const setAutoJudge = useAppStore(s => s.setAutoJudge);
   const sendKey = useAppStore(s => s.sendKey);
   const setSendKey = useAppStore(s => s.setSendKey);
+  const queryMode = useAppStore(s => s.queryMode);
   const { getModelsForProvider } = useModelDiscovery();
 
   const lengthOptions: Array<{ value: 'normal' | 'brief' | 'superbrief'; label: string; desc: string }> = [
@@ -145,7 +147,7 @@ function GeneralTab() {
       <div>
         <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Response Length</h3>
         <div className="flex gap-1">
-          {lengthOptions.map(opt => (
+          {lengthOptions.filter(opt => !(queryMode === 'access-code' && opt.value === 'normal')).map(opt => (
             <button
               key={opt.value}
               onClick={() => setResponseLength(opt.value)}
@@ -390,17 +392,20 @@ function AccountTab() {
 
   if (!isLoggedIn) {
     return (
-      <div>
-        <p className="text-[11px] text-text-secondary/70 mb-3 leading-snug">
-          Sign in to sync your API keys, settings, and optionally query history across devices. The app works fully without an account.
-        </p>
-        <button
-          onClick={() => setShowLogin(true)}
-          className="px-4 py-2 text-xs bg-accent/10 border border-accent/30 rounded text-accent hover:bg-accent/20 transition-colors"
-        >
-          Sign in
-        </button>
-        {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
+      <div className="space-y-4">
+        <div>
+          <p className="text-[11px] text-text-secondary/70 mb-3 leading-snug">
+            Sign in to sync your API keys, settings, and optionally query history across devices. The app works fully without an account.
+          </p>
+          <button
+            onClick={() => setShowLogin(true)}
+            className="px-4 py-2 text-xs bg-accent/10 border border-accent/30 rounded text-accent hover:bg-accent/20 transition-colors"
+          >
+            Sign in
+          </button>
+          {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
+        </div>
+        <AccessCodeSection />
       </div>
     );
   }
@@ -441,6 +446,9 @@ function AccountTab() {
           />
         ))}
       </div>
+
+      {/* Access Codes */}
+      <AccessCodeSection />
 
       <button
         onClick={logout}

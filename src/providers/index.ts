@@ -4,7 +4,7 @@ import { streamOpenAI, testOpenAIKey, discoverOpenAIModels } from './openai';
 import { streamAnthropic, testAnthropicKey, discoverAnthropicModels } from './anthropic';
 import { streamGemini, testGeminiKey, discoverGeminiModels } from './gemini';
 import { streamXAI, testXAIKey, discoverXAIModels } from './xai';
-import { proxyStream } from '../proxy/proxyStream';
+import { proxyStream, type ProxyReservation } from '../proxy/proxyStream';
 import { useAppStore } from '../store/appStore';
 import { supabase } from '../lib/supabase';
 import { logger } from '../lib/logger';
@@ -48,8 +48,20 @@ const discoverFns: Record<string, DiscoverModelsFn> = {
   xai: discoverXAIModels,
 };
 
-export function getStreamFn(providerId: string): StreamFn {
-  const { proxyProviders } = useAppStore.getState();
+export function getStreamFn(providerId: string, reservation?: ProxyReservation): StreamFn {
+  const { queryMode, proxyProviders } = useAppStore.getState();
+
+  // Access code mode: ALL providers go through proxy with reservation
+  if (queryMode === 'access-code') {
+    logger.stream.info(`${providerId} — using proxy (access-code mode)`);
+    const sessionPromise = supabase.auth.getSession();
+    return async (apiKey, model, query, files, callbacks, signal, history) => {
+      const { data: { session } } = await sessionPromise;
+      if (!session) throw new Error('Authentication required for access code mode');
+      return proxyStream(providerId, apiKey, model, query, files, callbacks, signal, history, reservation);
+    };
+  }
+
   if (proxyProviders?.has(providerId)) {
     logger.stream.info(`${providerId} — using proxy`);
     const sessionPromise = supabase.auth.getSession();

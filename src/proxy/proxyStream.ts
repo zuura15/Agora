@@ -3,8 +3,14 @@ import { parseApiError, type StreamCallbacks } from '../lib/streamUtils';
 import type { NormalizedFile } from '../lib/fileUtils';
 import { extractTextFromPdf } from '../lib/fileUtils';
 import type { ConversationTurn } from '../providers/index';
+import { useAppStore } from '../store/appStore';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+
+export interface ProxyReservation {
+  query_group_id: string;
+  active_code_id: string;
+}
 
 export async function proxyStream(
   providerId: string,
@@ -15,6 +21,7 @@ export async function proxyStream(
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
   _history?: ConversationTurn[],
+  reservation?: ProxyReservation,
 ): Promise<void> {
   // Build the input in the same format as the direct adapters
   const content: Array<Record<string, unknown>> = [];
@@ -50,17 +57,31 @@ export async function proxyStream(
     throw new Error('Not authenticated — sign in to use proxy mode');
   }
 
+  // Build request body with optional access code fields
+  const { queryMode, responseLength } = useAppStore.getState();
+  const isAccessCode = queryMode === 'access-code' && reservation;
+
+  const body: Record<string, unknown> = {
+    provider_id: providerId,
+    model,
+    input,
+  };
+
+  if (isAccessCode) {
+    body.access_code_mode = true;
+    body.query_group_id = reservation.query_group_id;
+    body.active_code_id = reservation.active_code_id;
+    body.request_id = crypto.randomUUID(); // Unique per provider call
+    body.response_length = responseLength;
+  }
+
   const response = await fetch(`${SUPABASE_URL}/functions/v1/proxy-stream`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${session.access_token}`,
     },
-    body: JSON.stringify({
-      provider_id: providerId,
-      model,
-      input,
-    }),
+    body: JSON.stringify(body),
     signal,
   });
 
@@ -69,7 +90,7 @@ export async function proxyStream(
     throw new Error(parseApiError('Proxy', response.status, error));
   }
 
-  // Parse SSE stream (same format as OpenAI/xAI Responses API)
+  // Parse SSE stream
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -111,6 +132,16 @@ export async function proxyStream(
               }
               callbacks.onDone();
               return;
+            }
+            // Access code balance update
+            if (parsed.type === 'argeon:balance') {
+              const store = useAppStore.getState();
+              if (typeof parsed.remaining_credit === 'number') {
+                store.setTotalBalance(parsed.remaining_credit);
+              }
+              if (typeof parsed.queries_today === 'number') {
+                store.setDailyQueryCount(parsed.queries_today);
+              }
             }
             if (parsed.type === 'error') {
               callbacks.onError(new Error(parsed.error?.message || 'Proxy stream error'));

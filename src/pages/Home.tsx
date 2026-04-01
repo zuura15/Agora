@@ -11,8 +11,11 @@ import { QueryInput } from '../components/QueryInput';
 import { ResponseColumn } from '../components/ResponseColumn';
 import { HistorySidebar } from '../components/HistorySidebar';
 import { SettingsDrawer } from '../components/SettingsDrawer';
+import { ModeSelector } from '../components/ModeSelector';
+import { ZeroBalanceBanner } from '../components/ZeroBalanceBanner';
 import { UserMenu } from '../auth/UserMenu';
 import { useAuthContext } from '../auth/AuthProvider';
+import { useAccessCodes } from '../hooks/useAccessCodes';
 import type { NormalizedFile } from '../lib/fileUtils';
 import type { QuerySession } from '../lib/dexie';
 
@@ -41,24 +44,27 @@ export function Home() {
   // Initialize model discovery
   useModelDiscovery();
 
-  // Redirect to setup if no keys configured
+  // Initialize access codes
+  useAccessCodes();
+  const accessCodesArr = useAppStore(s => s.accessCodes);
+  const queryMode = useAppStore(s => s.queryMode);
+  const setQueryMode = useAppStore(s => s.setQueryMode);
+  const hasActiveCodes = accessCodesArr.some(c => !c.blocked && c.remaining_credit > 0);
+
+  // Redirect to setup if no keys AND no access codes
   const { isLoggedIn, isLoading: authLoading } = useAuthContext();
   useEffect(() => {
-    // FIRST: Never redirect during OAuth callback — tokens must be processed
-    const hash = window.location.hash;
-    if (hash.includes('access_token') || hash.includes('refresh_token') || hash.includes('error')) {
-      return;
-    }
-
-    // SECOND: Wait for auth to finish loading
     if (authLoading) return;
-
-    // THIRD: If logged in, don't redirect (keys may be syncing from cloud)
-    if (isLoggedIn) return;
-
-    // FOURTH: Redirect to setup only if truly no keys
+    if (isLoggedIn) return; // Keys or codes may be syncing from cloud
     if (!hasAnyKey) navigate('/setup');
   }, [hasAnyKey, navigate, authLoading, isLoggedIn]);
+
+  // Auto-switch to access-code mode if user has codes but no BYOK keys
+  useEffect(() => {
+    if (hasActiveCodes && !hasAnyKey && queryMode === 'byok') {
+      setQueryMode('access-code');
+    }
+  }, [hasActiveCodes, hasAnyKey, queryMode, setQueryMode]);
 
   // Load session from URL param
   useEffect(() => {
@@ -159,10 +165,17 @@ export function Home() {
   return (
     <div className="h-screen flex flex-col">
       <PrivacyBanner />
+      <ZeroBalanceBanner />
+      {!isLoggedIn && hasAnyKey && (
+        <div className="flex items-center justify-center px-4 h-8 text-xs text-text-secondary bg-surface/80 border-b border-border shrink-0">
+          Using your own keys works even when not signed in. But your queries won't be synced.
+        </div>
+      )}
 
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
         <h1 className="text-lg font-display font-bold text-text-primary">Argeon</h1>
+        {isLoggedIn && <ModeSelector />}
         <div className="flex items-center gap-3">
           <button
             onClick={toggleTheme}

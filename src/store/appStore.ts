@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { PROVIDERS, PROVIDER_IDS } from '../providers/capabilities';
+import type { AccessCode, QueryMode } from '../types/accessCode';
+import { logger } from '../lib/logger';
 
 interface AppState {
   // API keys stored in localStorage
@@ -66,6 +68,22 @@ interface AppState {
   toggleHistory: () => void;
   toggleSettings: () => void;
   closeSettings: () => void;
+
+  // Access code system
+  queryMode: QueryMode;
+  setQueryMode: (mode: QueryMode) => void;
+  accessCodes: AccessCode[];
+  setAccessCodes: (codes: AccessCode[]) => void;
+  totalBalance: number;
+  setTotalBalance: (amount: number) => void;
+  dailyQueryCount: number;
+  setDailyQueryCount: (count: number) => void;
+  dailyQueryLimit: number;
+  availableProviders: string[];
+  setAvailableProviders: (ids: string[]) => void;
+  isAdmin: boolean;
+  setIsAdmin: (v: boolean) => void;
+  canSendAccessCodeQuery: () => { allowed: boolean; reason?: string };
 
   // Check if any provider is configured
   hasAnyKey: () => boolean;
@@ -140,6 +158,50 @@ export const useAppStore = create<AppState>((set, get) => ({
   historyOpen: false,
   settingsOpen: false,
 
+  // Access code system
+  queryMode: (localStorage.getItem('agora_query_mode') as QueryMode) || 'byok',
+  accessCodes: [],
+  totalBalance: 0,
+  dailyQueryCount: 0,
+  dailyQueryLimit: 20,
+  availableProviders: [],
+  isAdmin: false,
+
+  setQueryMode: (mode) => {
+    logger.access.info('setQueryMode', { mode });
+    localStorage.setItem('agora_query_mode', mode);
+    const state = get();
+    if (mode === 'access-code' && state.responseLength === 'normal') {
+      logger.access.info('setQueryMode — auto-switching to brief');
+      localStorage.setItem('agora_response_length', 'brief');
+      set({ queryMode: mode, responseLength: 'brief' });
+    } else {
+      set({ queryMode: mode });
+    }
+  },
+
+  setAccessCodes: (codes) => {
+    const activeCodes = codes.filter(c => !c.blocked && c.remaining_credit > 0);
+    const totalBalance = activeCodes.reduce((sum, c) => sum + Number(c.remaining_credit), 0);
+    logger.access.info('setAccessCodes', { total: codes.length, active: activeCodes.length, totalBalance });
+    set({ accessCodes: codes, totalBalance });
+  },
+
+  setTotalBalance: (amount) => set({ totalBalance: amount }),
+
+  setDailyQueryCount: (count) => set({ dailyQueryCount: count }),
+
+  setAvailableProviders: (ids) => set({ availableProviders: ids }),
+
+  setIsAdmin: (v) => set({ isAdmin: v }),
+
+  canSendAccessCodeQuery: () => {
+    const { totalBalance, dailyQueryCount, dailyQueryLimit } = get();
+    if (totalBalance <= 0) return { allowed: false, reason: 'Your access credit is depleted' };
+    if (dailyQueryCount >= dailyQueryLimit) return { allowed: false, reason: 'Daily query limit reached. Resets at midnight UTC.' };
+    return { allowed: true };
+  },
+
   setApiKey: (providerId, key) => {
     localStorage.setItem(`agora_key_${providerId}`, key);
     set(state => {
@@ -172,7 +234,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const judgeUpdate = state.judgeProvider === providerId ? { judgeProvider: null } : {};
         if (state.judgeProvider === providerId) localStorage.removeItem('agora_judge');
         return { activeProviders, ...judgeUpdate };
-      } else if (state.apiKeys[providerId] && activeProviders.size < 3) {
+      } else if ((state.apiKeys[providerId] || (state.queryMode === 'access-code' && state.availableProviders.includes(providerId))) && activeProviders.size < 3) {
         activeProviders.add(providerId);
       }
       return { activeProviders };
@@ -304,6 +366,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Clear IndexedDB
     // Clear IndexedDB via Dexie
     indexedDB.deleteDatabase('AgoraDB');
+    localStorage.removeItem('agora_query_mode');
     set({
       apiKeys: {},
       activeProviders: new Set(),
@@ -311,6 +374,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       discoveredModels: {},
       historyOpen: false,
       settingsOpen: false,
+      queryMode: 'byok',
+      accessCodes: [],
+      totalBalance: 0,
+      dailyQueryCount: 0,
+      availableProviders: [],
+      isAdmin: false,
     });
   },
 }));

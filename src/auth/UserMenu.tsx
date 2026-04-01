@@ -1,9 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from './useAuth';
+import { useAppStore } from '../store/appStore';
 import { LoginModal } from './LoginModal';
 
 export function UserMenu() {
+  const navigate = useNavigate();
   const { user, isLoggedIn, isLoading, logout } = useAuth();
+  const isAdmin = useAppStore(s => s.isAdmin);
   const [showLogin, setShowLogin] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -63,6 +67,14 @@ export function UserMenu() {
           <div className="px-3 py-2 border-b border-border">
             <p className="text-[11px] text-text-secondary truncate">{displayName}</p>
           </div>
+          {isAdmin && (
+            <button
+              onClick={() => { setShowDropdown(false); navigate('/admin'); }}
+              className="w-full px-3 py-2 text-left text-xs text-accent hover:bg-bg/50 transition-colors"
+            >
+              Admin
+            </button>
+          )}
           <button
             onClick={async () => {
               setShowDropdown(false);

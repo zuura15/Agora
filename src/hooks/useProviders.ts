@@ -4,6 +4,10 @@ import { useHistoryStore } from '../store/historyStore';
 import { PROVIDERS } from '../providers/capabilities';
 import { getStreamFn, type ConversationTurn } from '../providers/index';
 import { estimateCost, type TokenUsage } from '../lib/streamUtils';
+import { reserveQuery } from '../lib/accessCodeService';
+import type { ProxyReservation } from '../proxy/proxyStream';
+import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 import type { NormalizedFile } from '../lib/fileUtils';
 
 export interface ResponseState {
@@ -91,9 +95,68 @@ export function useProviders() {
     abortControllers.current = {};
 
     const isFollowUp = followUpMode && conversation.length > 0;
-    const providers = isFollowUp
-      ? Array.from(followUpProviders).filter(id => apiKeys[id])
-      : Array.from(activeProviders).filter(id => apiKeys[id]);
+    const { queryMode, availableProviders, canSendAccessCodeQuery, setTotalBalance, setDailyQueryCount } = useAppStore.getState();
+    const isAccessCode = queryMode === 'access-code';
+
+    logger.access.info('sendQuery', { queryMode, isAccessCode, isFollowUp, availableProviders, activeProviders: Array.from(activeProviders) });
+
+    let providers: string[];
+    let currentReservation: ProxyReservation | undefined;
+    if (isAccessCode) {
+      const activeIds = isFollowUp ? Array.from(followUpProviders) : Array.from(activeProviders);
+      providers = activeIds.filter(id => availableProviders.includes(id));
+      logger.access.info('sendQuery — access-code providers', { activeIds, filtered: providers });
+
+      if (providers.length === 0) {
+        logger.access.warn('sendQuery — no providers available, aborting');
+        return;
+      }
+
+      const check = canSendAccessCodeQuery();
+      if (!check.allowed) {
+        logger.access.warn('sendQuery — guard blocked', check);
+        // Show error as a fake response
+        const errorEntry: ConversationEntry = {
+          query,
+          responses: { '__error': { providerId: '__error', model: '', text: '', streaming: false, error: check.reason || 'Cannot send query', startTime: Date.now(), elapsedMs: 0, estimatedTokens: 0, usage: null, costUsd: null } },
+          isFollowUp: false,
+        };
+        setConversation(prev => [...prev, errorEntry]);
+        return;
+      }
+
+      // Reserve credit + claim daily slot
+      logger.access.info('sendQuery — reserving credit...');
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
+        const reservationResult = await reserveQuery(session);
+        logger.access.info('sendQuery — reservation success', reservationResult);
+        setTotalBalance(reservationResult.remaining_credit);
+        setDailyQueryCount(reservationResult.queries_today);
+        if (reservationResult.available_providers?.length) {
+          useAppStore.getState().setAvailableProviders(reservationResult.available_providers);
+        }
+        currentReservation = {
+          query_group_id: reservationResult.query_group_id,
+          active_code_id: reservationResult.active_code_id,
+        };
+      } catch (err: any) {
+        logger.access.error('sendQuery — reservation failed', err);
+        const msg = err?.error || err?.message || 'Reservation failed';
+        const errorEntry: ConversationEntry = {
+          query,
+          responses: { '__error': { providerId: '__error', model: '', text: '', streaming: false, error: msg, startTime: Date.now(), elapsedMs: 0, estimatedTokens: 0, usage: null, costUsd: null } },
+          isFollowUp: false,
+        };
+        setConversation(prev => [...prev, errorEntry]);
+        return;
+      }
+    } else {
+      providers = isFollowUp
+        ? Array.from(followUpProviders).filter(id => apiKeys[id])
+        : Array.from(activeProviders).filter(id => apiKeys[id]);
+    }
     if (providers.length === 0) return;
 
     // If not a follow-up, reset conversation
@@ -129,8 +192,8 @@ export function useProviders() {
       abortControllers.current[providerId] = controller;
 
       const model = selectedModels[providerId] || PROVIDERS[providerId].defaultModels[0];
-      const key = apiKeys[providerId];
-      const streamFn = getStreamFn(providerId);
+      const key = isAccessCode ? '' : apiKeys[providerId];
+      const streamFn = getStreamFn(providerId, currentReservation);
       const startTime = Date.now();
 
       // Get and summarize history for this provider
@@ -255,8 +318,9 @@ export function useProviders() {
 
     // Judge
     const { judgeProvider, autoJudge } = useAppStore.getState();
-    const shouldJudge = judgeProvider && apiKeys[judgeProvider] && providers.includes(judgeProvider);
-    if (shouldJudge || (autoJudge && judgeProvider && apiKeys[judgeProvider])) {
+    const hasJudgeKey = isAccessCode || apiKeys[judgeProvider!];
+    const shouldJudge = judgeProvider && hasJudgeKey && providers.includes(judgeProvider);
+    if (shouldJudge || (autoJudge && judgeProvider && hasJudgeKey)) {
       await new Promise(r => setTimeout(r, 100));
 
       setConversation(prev => {
@@ -268,8 +332,8 @@ export function useProviders() {
         if (otherResponses.length < 2) return prev;
 
         const judgeModel = selectedModels[judgeProvider] || PROVIDERS[judgeProvider].defaultModels[0];
-        const judgeKey = apiKeys[judgeProvider];
-        const streamFn = getStreamFn(judgeProvider);
+        const judgeKey = isAccessCode ? '' : apiKeys[judgeProvider];
+        const streamFn = getStreamFn(judgeProvider, currentReservation);
         const controller = new AbortController();
         abortControllers.current['__judge'] = controller;
         const judgePrompt = buildJudgePrompt(query, otherResponses);
@@ -352,8 +416,10 @@ export function useProviders() {
   }, [activeProviders, apiKeys, selectedModels, addSession, updateSessionResponse, followUpMode, followUpProviders, conversation]);
 
   const retryProvider = useCallback(async (providerId: string, query: string, files: NormalizedFile[]) => {
-    const key = apiKeys[providerId];
-    if (!key) return;
+    const { queryMode: retryMode } = useAppStore.getState();
+    const isRetryAccessCode = retryMode === 'access-code';
+    const key = isRetryAccessCode ? '' : apiKeys[providerId];
+    if (!key && !isRetryAccessCode) return;
 
     const model = selectedModels[providerId] || PROVIDERS[providerId].defaultModels[0];
     const controller = new AbortController();
@@ -382,7 +448,25 @@ export function useProviders() {
       return updated;
     });
 
-    const streamFn = getStreamFn(providerId);
+    // For access-code retries, reserve a new slot (costs another daily query)
+    let retryReservation: ProxyReservation | undefined;
+    if (isRetryAccessCode) {
+      try {
+        const { data: { session: retrySession } } = await supabase.auth.getSession();
+        if (!retrySession) return;
+        const res = await reserveQuery(retrySession);
+        useAppStore.getState().setTotalBalance(res.remaining_credit);
+        useAppStore.getState().setDailyQueryCount(res.queries_today);
+        retryReservation = {
+          query_group_id: res.query_group_id,
+          active_code_id: res.active_code_id,
+        };
+      } catch {
+        return; // Reservation failed, can't retry
+      }
+    }
+
+    const streamFn = getStreamFn(providerId, retryReservation);
     try {
       await streamFn(key, model, query, files, {
         onToken: (token) => {
