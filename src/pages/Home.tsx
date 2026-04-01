@@ -53,11 +53,20 @@ export function Home() {
 
   // Redirect to setup if no keys AND no access codes
   const { isLoggedIn, isLoading: authLoading } = useAuthContext();
+  const [syncWaited, setSyncWaited] = useState(false);
+
+  // Give cloud sync 2 seconds to pull keys/codes after login
+  useEffect(() => {
+    if (!isLoggedIn) { setSyncWaited(false); return; }
+    const timer = setTimeout(() => setSyncWaited(true), 2000);
+    return () => clearTimeout(timer);
+  }, [isLoggedIn]);
+
   useEffect(() => {
     if (authLoading) return;
-    if (isLoggedIn) return; // Keys or codes may be syncing from cloud
-    if (!hasAnyKey) navigate('/setup');
-  }, [hasAnyKey, navigate, authLoading, isLoggedIn]);
+    if (isLoggedIn && !syncWaited) return; // Still waiting for cloud sync
+    if (!hasAnyKey && !hasActiveCodes) navigate('/setup');
+  }, [hasAnyKey, hasActiveCodes, navigate, authLoading, isLoggedIn, syncWaited]);
 
   // Auto-switch to access-code mode if user has codes but no BYOK keys
   useEffect(() => {
